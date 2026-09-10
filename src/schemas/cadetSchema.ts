@@ -1,0 +1,53 @@
+import { z } from 'zod';
+
+export const CadetSchema = z.object({
+  id: z.string().optional(),
+  cadetNo: z.string().min(1, 'Cadet Number is required'),
+  name: z.string().min(1, 'Name is required'),
+  nameBangla: z.string().optional().default(''),
+  fatherName: z.string().optional().default(''),
+  fatherNameBangla: z.string().optional().default(''),
+  motherName: z.string().optional().default(''),
+  motherNameBangla: z.string().optional().default(''),
+  dob: z.string().optional().default(''),
+  religion: z.string().optional().default('Islam'),
+  className: z.string().optional().default('11th'),
+  category: z.string().optional().default('Male Platoon'),
+  section: z.string().optional().default('Section 01'),
+  rank: z.string().optional().default('Cadet'),
+  gender: z.string().optional().default('Male'),
+  appointment: z.string().optional().default('Cadet'),
+  platoon: z.string().optional().default('Male Platoon'),
+  batch: z.string().optional().default('Batch 24'),
+  collegeId: z.string().optional().default(''),
+  department: z.string().optional().default(''),
+  bloodGroup: z.string().optional().default('B+'),
+  phone: z.string().optional().default(''),
+  guardianPhone: z.string().optional().default(''),
+  email: z.string().optional().default(''),
+  joiningDate: z.string().optional().default(''),
+  attendancePercentage: z.number().optional().default(100),
+  paradesAttended: z.number().optional().default(0),
+  totalParades: z.number().optional().default(0),
+  status: z.string().optional().default('Active'),
+  cadetType: z.string().optional().default('Current'),
+  isApproved: z.boolean().optional().default(true),
+  avatarUrl: z.string().optional().default(''),
+  password: z.string().optional().default(''),
+  presentAddress: z.string().optional().default(''),
+  permanentAddress: z.string().optional().default(''),
+  currentJob: z.string().optional().default(''),
+  socialMedia: z.string().optional().default(''),
+  additionalSkills: z.string().optional().default(''),
+  achievements: z.string().optional().default(''),
+  campsAttended: z.array(z.any()).optional().default([]),
+  certificates: z.array(z.any()).optional().default([]),
+  customFields: z.record(z.string(), z.any()).optional(),
+  rawData: z.any().optional(),
+});
+
+export const BulkCadetsPayloadSchema = z.object({
+  cadets: z.array(z.any()),
+});
+
+export type CadetPayload = z.infer<typeof CadetSchema>;
