@@ -567,8 +567,26 @@ async function cleanDuplicateCadetsInMongo() {
       if (!cNo) continue;
       if (seenCadetNos.has(cNo)) {
         const existing = seenCadetNos.get(cNo);
-        // Prefer keeping record with usr- prefixed id
-        if (String(doc.id).startsWith('usr-') && !String(existing.id).startsWith('usr-')) {
+        
+        // Prioritize approved and active records
+        const newIsApproved = !!doc.isApproved || doc.status === 'Active' || doc.status === 'Alumni';
+        const existingIsApproved = !!existing.isApproved || existing.status === 'Active' || existing.status === 'Alumni';
+        
+        let keepNew = false;
+        if (newIsApproved && !existingIsApproved) {
+          keepNew = true;
+        } else if (!newIsApproved && existingIsApproved) {
+          keepNew = false;
+        } else {
+          // Prefer keeping record with usr- prefixed id
+          if (String(doc.id).startsWith('usr-') && !String(existing.id).startsWith('usr-')) {
+            keepNew = true;
+          } else {
+            keepNew = false;
+          }
+        }
+
+        if (keepNew) {
           idsToDelete.push(existing._id);
           seenCadetNos.set(cNo, doc);
         } else {

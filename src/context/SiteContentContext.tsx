@@ -493,17 +493,41 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try { upsertSiteSettingToApi(key, val); } catch {}
   };
 
-  const updateHeaderLeftLogoUrl = (url: string) => { setHeaderLeftLogoUrl(url); saveSetting('ngdc_header_left_logo', url); };
-  const resetHeaderLeftLogoUrl = () => { setHeaderLeftLogoUrl(DEFAULT_HEADER_LEFT_LOGO_URL); saveSetting('ngdc_header_left_logo', DEFAULT_HEADER_LEFT_LOGO_URL); };
+  const updateHeaderLeftLogoUrl = (url: string) => {
+    setHeaderLeftLogoUrl(url);
+    setTimeout(() => saveSetting('ngdc_header_left_logo', url), 0);
+  };
+  const resetHeaderLeftLogoUrl = () => {
+    setHeaderLeftLogoUrl(DEFAULT_HEADER_LEFT_LOGO_URL);
+    setTimeout(() => saveSetting('ngdc_header_left_logo', DEFAULT_HEADER_LEFT_LOGO_URL), 0);
+  };
 
-  const updateHeaderRightLogoUrl = (url: string) => { setHeaderRightLogoUrl(url); saveSetting('ngdc_header_right_logo', url); };
-  const resetHeaderRightLogoUrl = () => { setHeaderRightLogoUrl(DEFAULT_HEADER_RIGHT_LOGO_URL); saveSetting('ngdc_header_right_logo', DEFAULT_HEADER_RIGHT_LOGO_URL); };
+  const updateHeaderRightLogoUrl = (url: string) => {
+    setHeaderRightLogoUrl(url);
+    setTimeout(() => saveSetting('ngdc_header_right_logo', url), 0);
+  };
+  const resetHeaderRightLogoUrl = () => {
+    setHeaderRightLogoUrl(DEFAULT_HEADER_RIGHT_LOGO_URL);
+    setTimeout(() => saveSetting('ngdc_header_right_logo', DEFAULT_HEADER_RIGHT_LOGO_URL), 0);
+  };
 
-  const updateHeaderTitle = (title: string) => { setHeaderTitle(title); saveSetting('ngdc_header_title', title); };
-  const resetHeaderTitle = () => { setHeaderTitle(DEFAULT_HEADER_TITLE); saveSetting('ngdc_header_title', DEFAULT_HEADER_TITLE); };
+  const updateHeaderTitle = (title: string) => {
+    setHeaderTitle(title);
+    setTimeout(() => saveSetting('ngdc_header_title', title), 0);
+  };
+  const resetHeaderTitle = () => {
+    setHeaderTitle(DEFAULT_HEADER_TITLE);
+    setTimeout(() => saveSetting('ngdc_header_title', DEFAULT_HEADER_TITLE), 0);
+  };
 
-  const updateHeaderSubtitle = (subtitle: string) => { setHeaderSubtitle(subtitle); saveSetting('ngdc_header_subtitle', subtitle); };
-  const resetHeaderSubtitle = () => { setHeaderSubtitle(DEFAULT_HEADER_SUBTITLE); saveSetting('ngdc_header_subtitle', DEFAULT_HEADER_SUBTITLE); };
+  const updateHeaderSubtitle = (subtitle: string) => {
+    setHeaderSubtitle(subtitle);
+    setTimeout(() => saveSetting('ngdc_header_subtitle', subtitle), 0);
+  };
+  const resetHeaderSubtitle = () => {
+    setHeaderSubtitle(DEFAULT_HEADER_SUBTITLE);
+    setTimeout(() => saveSetting('ngdc_header_subtitle', DEFAULT_HEADER_SUBTITLE), 0);
+  };
 
   const updateHeaderBranding = async (branding: {
     headerLeftLogoUrl?: string;
@@ -518,188 +542,275 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return true;
   };
 
-  const updateSiteFavicon = (url: string) => { setSiteFavicon(url); saveSetting('ngdc_site_favicon', url); };
-  const resetSiteFavicon = () => { setSiteFavicon(DEFAULT_SITE_FAVICON); saveSetting('ngdc_site_favicon', DEFAULT_SITE_FAVICON); };
+  const updateSiteFavicon = (url: string) => {
+    setSiteFavicon(url);
+    setTimeout(() => saveSetting('ngdc_site_favicon', url), 0);
+  };
+  const resetSiteFavicon = () => {
+    setSiteFavicon(DEFAULT_SITE_FAVICON);
+    setTimeout(() => saveSetting('ngdc_site_favicon', DEFAULT_SITE_FAVICON), 0);
+  };
 
   const addHeroSlide = (slide: Omit<HeroSlide, 'id'>) => {
-    const next = [...heroSlides, { ...slide, id: `slide-${Date.now()}` }];
-    setHeroSlides(next); saveSetting('ngdc_hero_slides', next);
+    setHeroSlides((prev) => {
+      const next = [...prev, { ...slide, id: `slide-${Date.now()}` }];
+      setTimeout(() => saveSetting('ngdc_hero_slides', next), 0);
+      return next;
+    });
   };
   const updateHeroSlide = (id: string, slide: Partial<HeroSlide>) => {
-    const next = heroSlides.map((s) => (s.id === id ? { ...s, ...slide } : s));
-    setHeroSlides(next); saveSetting('ngdc_hero_slides', next);
+    setHeroSlides((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, ...slide } : s));
+      setTimeout(() => saveSetting('ngdc_hero_slides', next), 0);
+      return next;
+    });
   };
   const deleteHeroSlide = (id: string) => {
-    const next = heroSlides.filter((s) => s.id !== id);
-    setHeroSlides(next); saveSetting('ngdc_hero_slides', next);
+    setHeroSlides((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      setTimeout(() => saveSetting('ngdc_hero_slides', next), 0);
+      return next;
+    });
   };
 
   const updatePrincipalMessage = (config: Partial<ExecutiveMessageConfig>) => {
-    const next = { ...principalMessage, ...config };
-    setPrincipalMessage(next); saveSetting('ngdc_principal_message', next);
+    setPrincipalMessage((prev) => {
+      const next = { ...prev, ...config };
+      setTimeout(() => saveSetting('ngdc_principal_message', next), 0);
+      return next;
+    });
   };
-  const resetPrincipalMessage = () => { setPrincipalMessage(DEFAULT_PRINCIPAL_MESSAGE); saveSetting('ngdc_principal_message', DEFAULT_PRINCIPAL_MESSAGE); };
+  const resetPrincipalMessage = () => {
+    setPrincipalMessage(DEFAULT_PRINCIPAL_MESSAGE);
+    setTimeout(() => saveSetting('ngdc_principal_message', DEFAULT_PRINCIPAL_MESSAGE), 0);
+  };
 
   const updateVicePrincipalMessage = (config: Partial<ExecutiveMessageConfig>) => {
-    const next = { ...vicePrincipalMessage, ...config };
-    setVicePrincipalMessage(next); saveSetting('ngdc_vice_principal_message', next);
+    setVicePrincipalMessage((prev) => {
+      const next = { ...prev, ...config };
+      setTimeout(() => saveSetting('ngdc_vice_principal_message', next), 0);
+      return next;
+    });
   };
-  const resetVicePrincipalMessage = () => { setVicePrincipalMessage(DEFAULT_VICE_PRINCIPAL_MESSAGE); saveSetting('ngdc_vice_principal_message', DEFAULT_VICE_PRINCIPAL_MESSAGE); };
+  const resetVicePrincipalMessage = () => {
+    setVicePrincipalMessage(DEFAULT_VICE_PRINCIPAL_MESSAGE);
+    setTimeout(() => saveSetting('ngdc_vice_principal_message', DEFAULT_VICE_PRINCIPAL_MESSAGE), 0);
+  };
 
   const updateAboutOverview = (config: Partial<AboutOverviewConfig>) => {
-    const next = { ...aboutOverview, ...config };
-    setAboutOverview(next); saveSetting('ngdc_about_overview', next);
+    setAboutOverview((prev) => {
+      const next = { ...prev, ...config };
+      setTimeout(() => saveSetting('ngdc_about_overview', next), 0);
+      return next;
+    });
   };
-  const resetAboutOverview = () => { setAboutOverview(DEFAULT_ABOUT_OVERVIEW); saveSetting('ngdc_about_overview', DEFAULT_ABOUT_OVERVIEW); };
+  const resetAboutOverview = () => {
+    setAboutOverview(DEFAULT_ABOUT_OVERVIEW);
+    setTimeout(() => saveSetting('ngdc_about_overview', DEFAULT_ABOUT_OVERVIEW), 0);
+  };
 
   const updateBncco1Message = (config: Partial<ExecutiveMessageConfig>) => {
     setBncco1Message((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_bncco1_message', next);
+      setTimeout(() => saveSetting('ngdc_bncco1_message', next), 0);
       return next;
     });
   };
   const resetBncco1Message = () => {
     setBncco1Message(DEFAULT_BNCCO1_MESSAGE);
-    saveSetting('ngdc_bncco1_message', DEFAULT_BNCCO1_MESSAGE);
+    setTimeout(() => saveSetting('ngdc_bncco1_message', DEFAULT_BNCCO1_MESSAGE), 0);
   };
 
   const updateBncco2Message = (config: Partial<ExecutiveMessageConfig>) => {
     setBncco2Message((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_bncco2_message', next);
+      setTimeout(() => saveSetting('ngdc_bncco2_message', next), 0);
       return next;
     });
   };
   const resetBncco2Message = () => {
     setBncco2Message(DEFAULT_BNCCO2_MESSAGE);
-    saveSetting('ngdc_bncco2_message', DEFAULT_BNCCO2_MESSAGE);
+    setTimeout(() => saveSetting('ngdc_bncco2_message', DEFAULT_BNCCO2_MESSAGE), 0);
   };
 
   const updatePlatoonCommanderMessage = (config: Partial<ExecutiveMessageConfig>) => {
     setPlatoonCommanderMessage((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_platoon_commander_message', next);
+      setTimeout(() => saveSetting('ngdc_platoon_commander_message', next), 0);
       return next;
     });
   };
   const resetPlatoonCommanderMessage = () => {
     setPlatoonCommanderMessage(DEFAULT_PLATOON_COMMANDER_MESSAGE);
-    saveSetting('ngdc_platoon_commander_message', DEFAULT_PLATOON_COMMANDER_MESSAGE);
+    setTimeout(() => saveSetting('ngdc_platoon_commander_message', DEFAULT_PLATOON_COMMANDER_MESSAGE), 0);
   };
 
   const addAboutSection = (sec: Omit<CustomAboutSection, 'id'>) => {
     setAboutSections((prev) => {
       const next = [...prev, { ...sec, id: `sec-${Date.now()}` }];
-      saveSetting('ngdc_about_sections', next);
+      setTimeout(() => saveSetting('ngdc_about_sections', next), 0);
       return next;
     });
   };
   const updateAboutSection = (id: string, sec: Partial<CustomAboutSection>) => {
     setAboutSections((prev) => {
       const next = prev.map((s) => (s.id === id ? { ...s, ...sec } : s));
-      saveSetting('ngdc_about_sections', next);
+      setTimeout(() => saveSetting('ngdc_about_sections', next), 0);
       return next;
     });
   };
   const deleteAboutSection = (id: string) => {
     setAboutSections((prev) => {
       const next = prev.filter((s) => s.id !== id);
-      saveSetting('ngdc_about_sections', next);
+      setTimeout(() => saveSetting('ngdc_about_sections', next), 0);
       return next;
     });
   };
 
   const addTrainingAnnouncement = (ann: Omit<TrainingAnnouncement, 'id'>) => {
-    const next = [{ ...ann, id: `tr-${Date.now()}` }, ...trainingAnnouncements];
-    setTrainingAnnouncements(next); saveSetting('ngdc_trainings', next);
+    setTrainingAnnouncements((prev) => {
+      const next = [{ ...ann, id: `tr-${Date.now()}` }, ...prev];
+      setTimeout(() => saveSetting('ngdc_trainings', next), 0);
+      return next;
+    });
   };
   const updateTrainingAnnouncement = (id: string, ann: Partial<TrainingAnnouncement>) => {
-    const next = trainingAnnouncements.map((a) => (a.id === id ? { ...a, ...ann } : a));
-    setTrainingAnnouncements(next); saveSetting('ngdc_trainings', next);
+    setTrainingAnnouncements((prev) => {
+      const next = prev.map((a) => (a.id === id ? { ...a, ...ann } : a));
+      setTimeout(() => saveSetting('ngdc_trainings', next), 0);
+      return next;
+    });
   };
   const deleteTrainingAnnouncement = (id: string) => {
-    const next = trainingAnnouncements.filter((a) => a.id !== id);
-    setTrainingAnnouncements(next); saveSetting('ngdc_trainings', next);
+    setTrainingAnnouncements((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      setTimeout(() => saveSetting('ngdc_trainings', next), 0);
+      return next;
+    });
   };
 
   const addTrainingSubmission = (submission: Omit<CustomFormSubmission, 'id' | 'submittedAt'>) => {
-    const next = [{ ...submission, id: `sub-${Date.now()}`, submittedAt: new Date().toLocaleString() }, ...trainingSubmissions];
-    setTrainingSubmissions(next); saveSetting('ngdc_training_submissions', next);
+    setTrainingSubmissions((prev) => {
+      const next = [{ ...submission, id: `sub-${Date.now()}`, submittedAt: new Date().toLocaleString() }, ...prev];
+      setTimeout(() => saveSetting('ngdc_training_submissions', next), 0);
+      return next;
+    });
   };
   const updateTrainingSubmissionStatus = (id: string, status: string) => {
-    const next = trainingSubmissions.map((s) => (s.id === id ? { ...s, status } : s));
-    setTrainingSubmissions(next); saveSetting('ngdc_training_submissions', next);
+    setTrainingSubmissions((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, status } : s));
+      setTimeout(() => saveSetting('ngdc_training_submissions', next), 0);
+      return next;
+    });
   };
   const deleteTrainingSubmission = (id: string) => {
-    const next = trainingSubmissions.filter((s) => s.id !== id);
-    setTrainingSubmissions(next); saveSetting('ngdc_training_submissions', next);
+    setTrainingSubmissions((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      setTimeout(() => saveSetting('ngdc_training_submissions', next), 0);
+      return next;
+    });
   };
 
   const updatePlatoonRoutineConfig = (config: Partial<PlatoonRoutineConfig>) => {
     setPlatoonRoutineConfig((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_platoon_routine', next);
+      setTimeout(() => saveSetting('ngdc_platoon_routine', next), 0);
       return next;
     });
   };
 
   const addNotice = (notice: Omit<NoticeItem, 'id'>) => {
-    const next = [{ ...notice, id: `not-${Date.now()}` }, ...notices];
-    setNotices(next); saveSetting('ngdc_notices', next);
+    setNotices((prev) => {
+      const next = [{ ...notice, id: `not-${Date.now()}` }, ...prev];
+      setTimeout(() => saveSetting('ngdc_notices', next), 0);
+      return next;
+    });
   };
   const updateNotice = (id: string, notice: Partial<NoticeItem>) => {
-    const next = notices.map((n) => (n.id === id ? { ...n, ...notice } : n));
-    setNotices(next); saveSetting('ngdc_notices', next);
+    setNotices((prev) => {
+      const next = prev.map((n) => (n.id === id ? { ...n, ...notice } : n));
+      setTimeout(() => saveSetting('ngdc_notices', next), 0);
+      return next;
+    });
   };
   const deleteNotice = (id: string) => {
-    const next = notices.filter((n) => n.id !== id);
-    setNotices(next); saveSetting('ngdc_notices', next);
+    setNotices((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      setTimeout(() => saveSetting('ngdc_notices', next), 0);
+      return next;
+    });
   };
 
   const addBlog = (blog: Omit<BlogItem, 'id'>) => {
-    const next = [{ ...blog, id: `blog-${Date.now()}` }, ...blogs];
-    setBlogs(next); saveSetting('ngdc_blogs', next);
+    setBlogs((prev) => {
+      const next = [{ ...blog, id: `blog-${Date.now()}` }, ...prev];
+      setTimeout(() => saveSetting('ngdc_blogs', next), 0);
+      return next;
+    });
   };
   const updateBlog = (id: string, blog: Partial<BlogItem>) => {
-    const next = blogs.map((b) => (b.id === id ? { ...b, ...blog } : b));
-    setBlogs(next); saveSetting('ngdc_blogs', next);
+    setBlogs((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, ...blog } : b));
+      setTimeout(() => saveSetting('ngdc_blogs', next), 0);
+      return next;
+    });
   };
   const deleteBlog = (id: string) => {
-    const next = blogs.filter((b) => b.id !== id);
-    setBlogs(next); saveSetting('ngdc_blogs', next);
+    setBlogs((prev) => {
+      const next = prev.filter((b) => b.id !== id);
+      setTimeout(() => saveSetting('ngdc_blogs', next), 0);
+      return next;
+    });
   };
 
   const addMemory = (mem: Omit<MemoryItem, 'id'>) => {
-    const next = [{ ...mem, id: `mem-${Date.now()}` }, ...memories];
-    setMemories(next); saveSetting('ngdc_memories', next);
+    setMemories((prev) => {
+      const next = [{ ...mem, id: `mem-${Date.now()}` }, ...prev];
+      setTimeout(() => saveSetting('ngdc_memories', next), 0);
+      return next;
+    });
   };
   const updateMemory = (id: string, mem: Partial<MemoryItem>) => {
-    const next = memories.map((m) => (m.id === id ? { ...m, ...mem } : m));
-    setMemories(next); saveSetting('ngdc_memories', next);
+    setMemories((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, ...mem } : m));
+      setTimeout(() => saveSetting('ngdc_memories', next), 0);
+      return next;
+    });
   };
   const deleteMemory = (id: string) => {
-    const next = memories.filter((m) => m.id !== id);
-    setMemories(next); saveSetting('ngdc_memories', next);
+    setMemories((prev) => {
+      const next = prev.filter((m) => m.id !== id);
+      setTimeout(() => saveSetting('ngdc_memories', next), 0);
+      return next;
+    });
   };
 
   const addHonorEntry = (entry: Omit<HonorEntryItem, 'id'>) => {
-    const next = [{ ...entry, id: `honor-${Date.now()}` }, ...honorEntries];
-    setHonorEntries(next); saveSetting('ngdc_honor_entries', next);
+    setHonorEntries((prev) => {
+      const next = [{ ...entry, id: `honor-${Date.now()}` }, ...prev];
+      setTimeout(() => saveSetting('ngdc_honor_entries', next), 0);
+      return next;
+    });
   };
   const updateHonorEntry = (id: string, entry: Partial<HonorEntryItem>) => {
-    const next = honorEntries.map((h) => (h.id === id ? { ...h, ...entry } : h));
-    setHonorEntries(next); saveSetting('ngdc_honor_entries', next);
+    setHonorEntries((prev) => {
+      const next = prev.map((h) => (h.id === id ? { ...h, ...entry } : h));
+      setTimeout(() => saveSetting('ngdc_honor_entries', next), 0);
+      return next;
+    });
   };
   const deleteHonorEntry = (id: string) => {
-    const next = honorEntries.filter((h) => h.id !== id);
-    setHonorEntries(next); saveSetting('ngdc_honor_entries', next);
+    setHonorEntries((prev) => {
+      const next = prev.filter((h) => h.id !== id);
+      setTimeout(() => saveSetting('ngdc_honor_entries', next), 0);
+      return next;
+    });
   };
 
   const updateContactConfig = (config: Partial<ContactConfig>) => {
     setContactConfig((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_contact_config', next);
+      setTimeout(() => saveSetting('ngdc_contact_config', next), 0);
       return next;
     });
   };
@@ -708,7 +819,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const newMsg: ContactMessage = { ...msg, id: `msg-${Date.now()}`, timestamp: new Date().toLocaleString() };
     setContactMessages((prev) => {
       const next = [newMsg, ...prev];
-      saveSetting('ngdc_contact_messages', next);
+      setTimeout(() => saveSetting('ngdc_contact_messages', next), 0);
       return next;
     });
   };
@@ -716,7 +827,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const markContactMessageRead = (id: string) => {
     setContactMessages((prev) => {
       const next = prev.map((m) => (m.id === id ? { ...m, read: true } : m));
-      saveSetting('ngdc_contact_messages', next);
+      setTimeout(() => saveSetting('ngdc_contact_messages', next), 0);
       return next;
     });
   };
@@ -724,7 +835,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const deleteContactMessage = (id: string) => {
     setContactMessages((prev) => {
       const next = prev.filter((m) => m.id !== id);
-      saveSetting('ngdc_contact_messages', next);
+      setTimeout(() => saveSetting('ngdc_contact_messages', next), 0);
       return next;
     });
   };
@@ -732,7 +843,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const updateFooterConfig = (config: Partial<FooterConfig>) => {
     setFooterConfig((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_footer_config', next);
+      setTimeout(() => saveSetting('ngdc_footer_config', next), 0);
       return next;
     });
   };
@@ -740,7 +851,7 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const updateMaintenanceConfig = async (config: Partial<MaintenanceConfig>) => {
     setMaintenanceConfig((prev) => {
       const next = { ...prev, ...config };
-      saveSetting('ngdc_maintenance_config', next);
+      setTimeout(() => saveSetting('ngdc_maintenance_config', next), 0);
       return next;
     });
     return true;

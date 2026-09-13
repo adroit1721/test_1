@@ -129,7 +129,7 @@ interface CadetRosterContextType {
       rank?: string;
       cadetNo?: string;
     }
-  ) => void;
+  ) => void | Promise<void>;
   clearAllCadetUsers: () => void;
   
   cadetLogin: (cadetNo: string, pass: string) => { success: boolean; message: string; cadet?: CadetUserAccount };
@@ -223,14 +223,18 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const setCadetRegFields = useCallback((action: React.SetStateAction<FormFieldConfig[]>) => {
+    let nextVal: FormFieldConfig[] | null = null;
     setCadetRegFieldsState((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      nextVal = next;
       try {
         localStorage.setItem('ngdc_cadet_reg_fields', JSON.stringify(next));
       } catch {}
-      upsertSiteSettingToApi('ngdc_cadet_reg_fields', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_cadet_reg_fields', nextVal);
+    }
   }, []);
 
   const [cadetRanks, setCadetRanks] = useState<CadetRankHierarchyItem[]>(() => {
@@ -247,14 +251,18 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const setCadetRanksAndSave = useCallback((action: React.SetStateAction<CadetRankHierarchyItem[]>) => {
+    let nextVal: CadetRankHierarchyItem[] | null = null;
     setCadetRanks((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      nextVal = next;
       try {
         localStorage.setItem('ngdc_cadet_ranks', JSON.stringify(next));
       } catch {}
-      upsertSiteSettingToApi('ngdc_cadet_ranks', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_cadet_ranks', nextVal);
+    }
   }, []);
 
   const addCadetRank = useCallback((rank: Omit<CadetRankHierarchyItem, 'id'>) => {
@@ -313,6 +321,12 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const lastWrittenNo = cadetNo ? (lastLocalWriteTimestamps.current[cadetNo] || 0) : 0;
       if (now - lastWrittenId < 10000 || now - lastWrittenNo < 10000) {
         continue;
+      }
+      const existingItem = map.get(targetId);
+      if (existingItem && existingItem.isApproved && !item.isApproved) {
+        if (now - lastWrittenId < 60000) {
+          continue;
+        }
       }
       map.set(targetId, { ...map.get(targetId), ...item });
     }
@@ -554,7 +568,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [addCadetTombstone, setCadetUsersAndSave]);
 
-  const approveCadetApplicant = useCallback((
+  const approveCadetApplicant = useCallback(async (
     id: string,
     options: { password: string; category?: PlatoonCategory; section?: string; rank?: string; cadetNo?: string }
   ) => {
@@ -564,12 +578,14 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const now = Date.now();
     if (targetId) lastLocalWriteTimestamps.current[targetId] = now;
 
+    let finalApprovedCadet: CadetUserAccount | null = null;
+
     setCadetUsersAndSave((prev) => {
       const existing = prev.find((c) => c && targetId && String(c.id).trim() === targetId);
       const targetCategory: PlatoonCategory = options.category || (existing ? existing.category : 'Male Platoon') || 'Male Platoon';
       const isExCadet = (existing && existing.cadetType === 'Ex-cadet') || targetCategory === 'Ex-cadets';
 
-      const finalApprovedCadet: CadetUserAccount = existing
+      const approved: CadetUserAccount = existing
         ? {
             ...existing,
             cadetNo: options.cadetNo?.trim() || existing.cadetNo,
@@ -611,22 +627,30 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
             avatarUrl: '',
           };
 
-      try {
-        upsertCadetToApi(finalApprovedCadet);
-      } catch (err) {
-        console.warn('Failed to upsert approved cadet to API:', err);
-      }
+      finalApprovedCadet = approved;
 
       let found = false;
       const next = prev.map((c) => {
         if (c && targetId && String(c.id).trim() === targetId) {
           found = true;
-          return finalApprovedCadet;
+          return approved;
         }
         return c;
       });
-      return found ? next : [finalApprovedCadet, ...next];
+      return found ? next : [approved, ...next];
     });
+
+    if (finalApprovedCadet) {
+      const cadet = finalApprovedCadet as CadetUserAccount;
+      if (cadet.cadetNo) {
+        lastLocalWriteTimestamps.current[cadet.cadetNo.trim().toUpperCase()] = now;
+      }
+      try {
+        await upsertCadetToApi(cadet);
+      } catch (err) {
+        console.warn('Failed to upsert approved cadet to API:', err);
+      }
+    }
   }, [removeCadetTombstone, setCadetUsersAndSave]);
 
   const clearAllCadetUsers = useCallback(() => {
@@ -852,22 +876,30 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       id,
       addedAt: new Date().toISOString().slice(0, 10),
     };
+    let nextVal: TrainingManual[] | null = null;
     setTrainingManuals((prev) => {
       const next = [newManual, ...prev];
+      nextVal = next;
       try { localStorage.setItem('ngdc_training_manuals', JSON.stringify(next)); } catch {}
-      upsertSiteSettingToApi('ngdc_training_manuals', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_training_manuals', nextVal);
+    }
     return id;
   }, []);
 
   const deleteTrainingManual = useCallback((id: string) => {
+    let nextVal: TrainingManual[] | null = null;
     setTrainingManuals((prev) => {
       const next = prev.filter((m) => m.id !== id);
+      nextVal = next;
       try { localStorage.setItem('ngdc_training_manuals', JSON.stringify(next)); } catch {}
-      upsertSiteSettingToApi('ngdc_training_manuals', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_training_manuals', nextVal);
+    }
   }, []);
 
   const verifyCadet = useCallback((cadetNo: string): CadetUserAccount | null => {

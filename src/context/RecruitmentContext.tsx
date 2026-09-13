@@ -154,12 +154,14 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const updateRecruitmentAnnouncement = (ann: Partial<RecruitmentAnnouncementConfig> | null) => {
+    let nextVal: RecruitmentAnnouncementConfig | null = null;
     setRecruitmentAnnouncement((prev) => {
       const next = ann ? ({ ...(prev || DEFAULT_RECRUITMENT_ANNOUNCEMENT), ...ann } as RecruitmentAnnouncementConfig) : null;
+      nextVal = next;
       try { localStorage.setItem('ngdc_recruitment_announcement', JSON.stringify(next)); } catch {}
-      upsertSiteSettingToApi('ngdc_recruitment_announcement', next);
       return next;
     });
+    upsertSiteSettingToApi('ngdc_recruitment_announcement', nextVal);
   };
 
   const deleteRecruitmentAnnouncement = () => {
@@ -182,12 +184,16 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const setRecruitmentFields = useCallback((action: React.SetStateAction<FormFieldConfig[]>) => {
+    let nextVal: FormFieldConfig[] | null = null;
     setRecruitmentFieldsState((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      nextVal = next;
       try { localStorage.setItem('ngdc_recruitment_fields', JSON.stringify(next)); } catch {}
-      upsertSiteSettingToApi('ngdc_recruitment_fields', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_recruitment_fields', nextVal);
+    }
   }, []);
 
   const [recruitmentApplicants, setRecruitmentApplicants] = useState<RecruitmentApplicant[]>(() => {
@@ -343,12 +349,16 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   });
 
   const updateRecruitmentSignatories = (config: Partial<RecruitmentSignatoriesConfig>) => {
+    let nextVal: RecruitmentSignatoriesConfig | null = null;
     setRecruitmentSignatories((prev) => {
       const next = { ...prev, ...config };
+      nextVal = next;
       try { localStorage.setItem('ngdc_recruitment_signatories', JSON.stringify(next)); } catch {}
-      upsertSiteSettingToApi('ngdc_recruitment_signatories', next);
       return next;
     });
+    if (nextVal) {
+      upsertSiteSettingToApi('ngdc_recruitment_signatories', nextVal);
+    }
   };
 
   const resetRecruitmentSignatories = () => {
