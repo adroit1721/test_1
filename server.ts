@@ -15,7 +15,7 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const PORT = 3000;
-const JWT_SECRET = process.env.JWT_SECRET || (globalThis as any)._generatedJwtSecret || ((globalThis as any)._generatedJwtSecret = `ngdc_secret_${Math.random().toString(36).slice(2)}_${Date.now()}`);
+const JWT_SECRET = process.env.JWT_SECRET || 'ngdc_bncc_portal_stable_jwt_secret_key_1979_development';
 
 // --- CORS: Allow all origins and methods (security is enforced via JWT on write endpoints) ---
 app.use(

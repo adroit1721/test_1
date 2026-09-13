@@ -3,6 +3,8 @@ import { safeStorage } from '../utils/safeStorage';
 import {
   loginOfficer as apiLoginOfficer,
   updateOfficerCredentials as apiUpdateOfficerCredentials,
+  verifyAuthToken as apiVerifyAuthToken,
+  setAuthToken as apiSetAuthToken,
 } from '../utils/apiClient';
 
 interface LockoutStatus {
@@ -88,8 +90,23 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const logoutAdminHandler = useCallback(() => {
     setIsAdminLoggedIn(false);
+    apiSetAuthToken(null);
     safeStorage.removeItem('ngdc_admin_session');
   }, []);
+
+  // Verify stored session token on mount to prevent silent fake-login states
+  useEffect(() => {
+    const verifySession = async () => {
+      if (isAdminLoggedIn) {
+        const isValid = await apiVerifyAuthToken();
+        if (!isValid) {
+          console.warn('[AdminAuth] Proactive token verification failed. Logging out...');
+          logoutAdminHandler();
+        }
+      }
+    };
+    verifySession();
+  }, [isAdminLoggedIn, logoutAdminHandler]);
 
   const updateOfficerCredentialsHandler = useCallback(
     async (currentPassword: string, newOfficerId: string, newPassword: string) => {
