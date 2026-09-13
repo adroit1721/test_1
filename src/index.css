@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+}
+
+@layer components {
+  .japandi-input {
+    @apply w-full px-3.5 py-2.5 bg-[#fcf9f3] text-[#1c1c18] border border-[#cdc6b3] rounded-xl text-sm transition-all outline-none focus:ring-2 focus:ring-[#eedc82] focus:border-[#6b5e10] placeholder-[#a09887] disabled:bg-[#f4efe4] disabled:text-[#888070];
+  }
+
+  .japandi-btn-primary {
+    @apply px-5 py-2.5 bg-[#1c1c18] text-[#fcfbf7] hover:bg-[#2e2d27] font-semibold text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#eedc82] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .japandi-btn-secondary {
+    @apply px-5 py-2.5 bg-[#f4efe4] text-[#1c1c18] border border-[#cdc6b3] hover:bg-[#e8e2d2] font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#eedc82] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .japandi-card {
+    @apply bg-[#fcf9f3] dark:bg-[#1e1d19] border border-[#cdc6b3]/60 rounded-2xl p-6 shadow-xs transition-all;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar,
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
