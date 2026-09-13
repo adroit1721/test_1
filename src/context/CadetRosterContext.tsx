@@ -157,6 +157,7 @@ const CadetRosterContext = createContext<CadetRosterContextType | undefined>(und
 
 export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const lastLocalWriteTimestamps = useRef<Record<string, number>>({});
+  const lastPendingUpdatesWriteTime = useRef<number>(0);
   const deletedCadetTombstones = useRef<Set<string>>((() => {
     const s = new Set<string>();
     if (typeof window !== 'undefined') {
@@ -360,7 +361,10 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
             setTrainingManuals(settings.ngdc_training_manuals);
           }
           if (Array.isArray(settings.ngdc_cadet_pending_updates)) {
-            setPendingProfileUpdates(settings.ngdc_cadet_pending_updates);
+            const now = Date.now();
+            if (now - lastPendingUpdatesWriteTime.current > 8000) {
+              setPendingProfileUpdates(settings.ngdc_cadet_pending_updates);
+            }
           }
         }
       }).catch(() => {});
@@ -407,7 +411,10 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
         } else if (detail.key === 'ngdc_training_manuals' && Array.isArray(detail.value)) {
           setTrainingManuals(detail.value);
         } else if (detail.key === 'ngdc_cadet_pending_updates' && Array.isArray(detail.value)) {
-          setPendingProfileUpdates(detail.value);
+          const now = Date.now();
+          if (now - lastPendingUpdatesWriteTime.current > 8000) {
+            setPendingProfileUpdates(detail.value);
+          }
         }
       }
     };
@@ -790,6 +797,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       changes,
     };
 
+    lastPendingUpdatesWriteTime.current = Date.now();
     setPendingProfileUpdates((prev) => {
       const next = [updateReq, ...prev.filter((p) => p.id !== updateReq.id)];
       try {
@@ -809,6 +817,8 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const approveProfileUpdate = useCallback(async (requestId: string) => {
     const req = pendingProfileUpdates.find((p) => p.id === requestId);
     if (!req) return;
+
+    lastPendingUpdatesWriteTime.current = Date.now();
 
     // Apply the exact changed fields to the existing cadet
     const targetNo = req.cadetNo ? String(req.cadetNo).trim().toUpperCase() : '';
@@ -836,6 +846,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [pendingProfileUpdates, cadetUsers, updateCadetUser]);
 
   const rejectProfileUpdate = useCallback(async (requestId: string) => {
+    lastPendingUpdatesWriteTime.current = Date.now();
     const remaining = pendingProfileUpdates.filter((p) => p.id !== requestId);
     setPendingProfileUpdates(remaining);
     try {

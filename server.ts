@@ -651,6 +651,26 @@ async function initMongoConnection(): Promise<boolean> {
   }
 }
 
+// Check database version to verify cache freshness and re-hydrate if database version is newer
+async function ensureCacheIsFresh(): Promise<void> {
+  if (mongoose.connection.readyState !== 1) return;
+  try {
+    const versionDoc = await SettingModel.findOne({ key: 'ngdc_sync_version' }).lean();
+    if (versionDoc && typeof versionDoc.value === 'number') {
+      const dbVersion = versionDoc.value;
+      if (dbVersion > syncVersion) {
+        console.log(`[Cache Handshake] Stale cache detected. Local version: ${syncVersion}, DB version: ${dbVersion}. Forcing fresh hydration...`);
+        isCacheHydrated = false;
+        hydrationPromise = null;
+        await hydrateCacheFromDb();
+        syncVersion = dbVersion;
+      }
+    }
+  } catch (err) {
+    console.warn('[Cache Handshake] Stale check failed:', err);
+  }
+}
+
 // Background reconnect worker in standalone mode
 if (!process.env.VERCEL) {
   setInterval(() => {
@@ -934,12 +954,15 @@ app.get('/api/auth/verify', (req, res) => {
 });
 
 // 5. Settings Endpoints
-app.get('/api/settings', (_req, res) => {
+app.get('/api/settings', async (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
 
-  initMongoConnection().catch(() => {});
+  try {
+    await initMongoConnection();
+    await ensureCacheIsFresh();
+  } catch {}
 
   const publicSafeSettings = { ...cachedSettings };
   delete publicSafeSettings['ngdc_admin_master_password'];
@@ -1246,6 +1269,8 @@ app.post('/api/cadets/register', async (req, res) => {
 // Cadet Profile Update Request Endpoint (Public - Queues in Admin Approval Console)
 app.get('/api/cadets/pending-updates', async (req, res) => {
   try {
+    await initMongoConnection();
+    await ensureCacheIsFresh();
     let currentUpdates: any[] = [];
     if (Array.isArray(cachedSettings['ngdc_cadet_pending_updates'])) {
       currentUpdates = cachedSettings['ngdc_cadet_pending_updates'];
@@ -1607,9 +1632,7 @@ app.get('/api/recruitment/applicants', async (req, res) => {
 
   try {
     await initMongoConnection();
-    if (!isCacheHydrated) {
-      await hydrateCacheFromDb();
-    }
+    await ensureCacheIsFresh();
   } catch {}
 
   const raw = cachedSettings['ngdc_recruitment_applicants'];
@@ -1937,9 +1960,7 @@ app.get('/api/cadets', async (req, res) => {
 
   try {
     await initMongoConnection();
-    if (!isCacheHydrated) {
-      await hydrateCacheFromDb();
-    }
+    await ensureCacheIsFresh();
   } catch {}
 
   const { page, limit, search, category, rank } = req.query;
