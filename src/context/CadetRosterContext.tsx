@@ -16,6 +16,8 @@ import {
   deleteCadetFromApi,
   submitCadetProfileUpdateRequestToApi,
   fetchPendingProfileUpdatesFromApi,
+  fetchSiteSettingsFromApi,
+  upsertSiteSettingToApi,
 } from '../utils/apiClient';
 
 const localStorage = {
@@ -225,6 +227,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         localStorage.setItem('ngdc_cadet_reg_fields', JSON.stringify(next));
       } catch {}
+      upsertSiteSettingToApi('ngdc_cadet_reg_fields', next);
       return next;
     });
   }, []);
@@ -248,6 +251,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         localStorage.setItem('ngdc_cadet_ranks', JSON.stringify(next));
       } catch {}
+      upsertSiteSettingToApi('ngdc_cadet_ranks', next);
       return next;
     });
   }, []);
@@ -316,7 +320,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const syncCadetsWithCloud = useCallback(async () => {
     try {
-      const dbCadets = await fetchCadetsFromApi();
+      const dbCadets = await fetchCadetsFromApi(true);
       if (dbCadets && Array.isArray(dbCadets)) {
         const valid = dbCadets.filter((c) => c && c.id && !isCadetTombstoned(c.id) && !isSampleCadet(c.id));
         setCadetUsers((prev) => {
@@ -327,8 +331,26 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
           } catch {}
           return merged;
         });
-        return true;
       }
+
+      fetchSiteSettingsFromApi(true).then((settings) => {
+        if (settings) {
+          if (Array.isArray(settings.ngdc_cadet_reg_fields) && settings.ngdc_cadet_reg_fields.length > 0) {
+            setCadetRegFieldsState(settings.ngdc_cadet_reg_fields);
+          }
+          if (Array.isArray(settings.ngdc_cadet_ranks) && settings.ngdc_cadet_ranks.length > 0) {
+            setCadetRanks(settings.ngdc_cadet_ranks);
+          }
+          if (Array.isArray(settings.ngdc_training_manuals) && settings.ngdc_training_manuals.length > 0) {
+            setTrainingManuals(settings.ngdc_training_manuals);
+          }
+          if (Array.isArray(settings.ngdc_cadet_pending_updates)) {
+            setPendingProfileUpdates(settings.ngdc_cadet_pending_updates);
+          }
+        }
+      }).catch(() => {});
+
+      return true;
     } catch (err) {
       console.warn('Manual remote sync failed:', err);
     }
@@ -336,7 +358,50 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     syncCadetsWithCloud();
-  }, [syncCadetsWithCloud]);
+
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+
+      if (detail.collection === 'cadets') {
+        if (detail.action === 'delete') {
+          const id = detail.payload?.id || detail.payload;
+          if (id) {
+            setCadetUsers((prev) => prev.filter((c) => c.id !== id && c.cadetNo !== id));
+          }
+        } else if (detail.action === 'bulk' && Array.isArray(detail.payload)) {
+          setCadetUsers((prev) => mergeCadetLists(prev, detail.payload));
+        } else if (detail.payload && typeof detail.payload === 'object') {
+          const updated = detail.payload;
+          if (updated.id) {
+            setCadetUsers((prev) => {
+              const exists = prev.some((c) => c.id === updated.id);
+              if (exists) {
+                return prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c));
+              }
+              return [updated, ...prev];
+            });
+          }
+        }
+      } else if (detail.collection === 'site_settings') {
+        if (detail.key === 'ngdc_cadet_reg_fields' && Array.isArray(detail.value)) {
+          setCadetRegFieldsState(detail.value);
+        } else if (detail.key === 'ngdc_cadet_ranks' && Array.isArray(detail.value)) {
+          setCadetRanks(detail.value);
+        } else if (detail.key === 'ngdc_training_manuals' && Array.isArray(detail.value)) {
+          setTrainingManuals(detail.value);
+        } else if (detail.key === 'ngdc_cadet_pending_updates' && Array.isArray(detail.value)) {
+          setPendingProfileUpdates(detail.value);
+        }
+      }
+    };
+
+    window.addEventListener('ngdc-sync-event', handleSync);
+    return () => {
+      window.removeEventListener('ngdc-sync-event', handleSync);
+    };
+  }, [syncCadetsWithCloud, mergeCadetLists]);
 
   const addCadetUser = useCallback((user: Omit<CadetUserAccount, 'id'>) => {
     const category: PlatoonCategory = user.category || 'Male Platoon';
@@ -737,6 +802,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTrainingManuals((prev) => {
       const next = [newManual, ...prev];
       try { localStorage.setItem('ngdc_training_manuals', JSON.stringify(next)); } catch {}
+      upsertSiteSettingToApi('ngdc_training_manuals', next);
       return next;
     });
     return id;
@@ -746,6 +812,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setTrainingManuals((prev) => {
       const next = prev.filter((m) => m.id !== id);
       try { localStorage.setItem('ngdc_training_manuals', JSON.stringify(next)); } catch {}
+      upsertSiteSettingToApi('ngdc_training_manuals', next);
       return next;
     });
   }, []);

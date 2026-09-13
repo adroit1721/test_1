@@ -145,7 +145,7 @@ function getRequestHeaders(): Record<string, string> {
   return headers;
 }
 
-// --- Global API Request Debouncing & 60-second TTL Caching Mechanism ---
+// --- Global API Request Debouncing & 1.5-second TTL Caching Mechanism ---
 interface ApiCacheEntry<T> {
   data: T;
   timestamp: number;
@@ -153,7 +153,7 @@ interface ApiCacheEntry<T> {
 
 const apiResponseCache = new Map<string, ApiCacheEntry<any>>();
 const inFlightRequests = new Map<string, Promise<any>>();
-const CACHE_TTL_MS = 60000; // 60 seconds default cache TTL to prevent redundant requests
+const CACHE_TTL_MS = 1500; // 1.5 seconds default cache TTL to prevent redundant bursts while ensuring fresh real-time data
 
 export function invalidateApiCache(keyPrefix?: string) {
   if (!keyPrefix) {
@@ -164,6 +164,24 @@ export function invalidateApiCache(keyPrefix?: string) {
     if (k.startsWith(keyPrefix)) {
       apiResponseCache.delete(k);
     }
+  }
+}
+
+/**
+ * Global dispatch for in-app reactive real-time state synchronization
+ */
+export function dispatchSyncEvent(event: {
+  collection: 'site_settings' | 'cadets' | 'recruitment_applicants';
+  payload: any;
+  action: string;
+  type?: string;
+  key?: string;
+  value?: any;
+}) {
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('ngdc-sync-event', { detail: event }));
+    } catch {}
   }
 }
 
@@ -204,8 +222,12 @@ async function fetchWithCache<T>(
 /**
  * Fetch all site settings from Express backend (served from RAM/MongoDB in 0-1ms)
  */
-export async function fetchSiteSettingsFromApi(): Promise<Record<string, any> | null> {
-  return fetchWithCache('site_settings', async () => {
+export async function fetchSiteSettingsFromApi(skipCache = false): Promise<Record<string, any> | null> {
+  if (skipCache) {
+    invalidateApiCache('site_settings');
+  }
+
+  const doFetch = async () => {
     try {
       const res = await fetch(apiUrl(`/api/settings?_t=${Date.now()}`), {
         cache: 'no-store',
@@ -245,7 +267,12 @@ export async function fetchSiteSettingsFromApi(): Promise<Record<string, any> | 
       } catch {}
     }
     return null;
-  });
+  };
+
+  if (skipCache) {
+    return doFetch();
+  }
+  return fetchWithCache('site_settings', doFetch);
 }
 
 /**
@@ -253,11 +280,27 @@ export async function fetchSiteSettingsFromApi(): Promise<Record<string, any> | 
  */
 export async function upsertSiteSettingToApi(key: string, value: any): Promise<boolean> {
   invalidateApiCache('site_settings');
+  if (key === 'ngdc_recruitment_applicants') {
+    invalidateApiCache('recruitment_applicants');
+  } else if (key === 'ngdc_cadet_users_v8' || key === 'ngdc_cadet_users') {
+    invalidateApiCache('cadets');
+  }
+
   // 1. Immediate local write for zero latency
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
     } catch {}
+
+    // Dispatch locally right away
+    dispatchSyncEvent({
+      collection: 'site_settings',
+      payload: { key, value },
+      action: 'update',
+      type: 'SETTINGS_UPDATED',
+      key,
+      value,
+    });
   }
 
   // 2. Persist to Express backend with JWT header
@@ -277,8 +320,12 @@ export async function upsertSiteSettingToApi(key: string, value: any): Promise<b
 /**
  * Fetch all cadets from Express backend (served from RAM/MongoDB in 0-1ms)
  */
-export async function fetchCadetsFromApi(): Promise<CadetUserAccount[] | null> {
-  return fetchWithCache('cadets', async () => {
+export async function fetchCadetsFromApi(skipCache = false): Promise<CadetUserAccount[] | null> {
+  if (skipCache) {
+    invalidateApiCache('cadets');
+  }
+
+  const doFetch = async () => {
     try {
       const res = await fetch(apiUrl(`/api/cadets?_t=${Date.now()}`), {
         cache: 'no-store',
@@ -308,7 +355,12 @@ export async function fetchCadetsFromApi(): Promise<CadetUserAccount[] | null> {
       } catch {}
     }
     return null;
-  });
+  };
+
+  if (skipCache) {
+    return doFetch();
+  }
+  return fetchWithCache('cadets', doFetch);
 }
 
 /**
@@ -318,6 +370,9 @@ export async function submitRecruitmentApplicationToApi(
   applicant: any
 ): Promise<{ success: boolean; applicant?: any; token?: string; error?: string }> {
   if (!applicant) return { success: false, error: 'Empty applicant payload' };
+  invalidateApiCache('recruitment_applicants');
+  invalidateApiCache('site_settings');
+
   try {
     const res = await fetch(apiUrl('/api/recruitment/apply'), {
       method: 'POST',
@@ -326,6 +381,14 @@ export async function submitRecruitmentApplicationToApi(
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.success) {
+      invalidateApiCache('recruitment_applicants');
+      invalidateApiCache('site_settings');
+      dispatchSyncEvent({
+        collection: 'recruitment_applicants',
+        payload: { applicant: data.applicant || applicant, key: 'ngdc_recruitment_applicants' },
+        action: 'recruitment_application',
+        type: 'RECRUITMENT_APPLICATION_SUBMITTED',
+      });
       return { success: true, applicant: data.applicant, token: data.token };
     }
     return { success: false, error: data.error || `Server responded with status ${res.status}` };
@@ -338,8 +401,12 @@ export async function submitRecruitmentApplicationToApi(
 /**
  * Fetch all cadet recruitment applications from the Express backend
  */
-export async function fetchRecruitmentApplicantsFromApi(): Promise<any[] | null> {
-  return fetchWithCache('recruitment_applicants', async () => {
+export async function fetchRecruitmentApplicantsFromApi(skipCache = false): Promise<any[] | null> {
+  if (skipCache) {
+    invalidateApiCache('recruitment_applicants');
+  }
+
+  const doFetch = async () => {
     try {
       const res = await fetch(apiUrl(`/api/recruitment/applicants?_t=${Date.now()}`), {
         cache: 'no-store',
@@ -352,7 +419,12 @@ export async function fetchRecruitmentApplicantsFromApi(): Promise<any[] | null>
       console.warn('[API Client] Failed to fetch recruitment applicants:', err);
       return null;
     }
-  });
+  };
+
+  if (skipCache) {
+    return doFetch();
+  }
+  return fetchWithCache('recruitment_applicants', doFetch);
 }
 
 /**
@@ -366,6 +438,8 @@ export async function deleteRecruitmentApplicantFromApi(id: string): Promise<boo
       method: 'DELETE',
       headers: getRequestHeaders(),
     });
+    invalidateApiCache('recruitment_applicants');
+    invalidateApiCache('site_settings');
     return res.ok;
   } catch (err) {
     console.warn(`[API Client] Failed to delete recruitment applicant ${id}:`, err);
@@ -377,6 +451,7 @@ export async function deleteRecruitmentApplicantFromApi(id: string): Promise<boo
  * Submit a contact form message to Express backend (public endpoint)
  */
 export async function submitContactMessageToApi(msg: any): Promise<{ success: boolean; error?: string }> {
+  invalidateApiCache('site_settings');
   try {
     const res = await fetch(apiUrl('/api/contact/submit'), {
       method: 'POST',
@@ -384,6 +459,7 @@ export async function submitContactMessageToApi(msg: any): Promise<{ success: bo
       body: JSON.stringify(msg),
     });
     const data = await res.json().catch(() => ({}));
+    invalidateApiCache('site_settings');
     return { success: res.ok && data.success, error: data.error };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Network error' };
@@ -394,6 +470,7 @@ export async function submitContactMessageToApi(msg: any): Promise<{ success: bo
  * Submit training response to Express backend (public endpoint)
  */
 export async function submitTrainingSubmissionToApi(submission: any): Promise<{ success: boolean; error?: string }> {
+  invalidateApiCache('site_settings');
   try {
     const res = await fetch(apiUrl('/api/training/submit'), {
       method: 'POST',
@@ -401,6 +478,7 @@ export async function submitTrainingSubmissionToApi(submission: any): Promise<{ 
       body: JSON.stringify(submission),
     });
     const data = await res.json().catch(() => ({}));
+    invalidateApiCache('site_settings');
     return { success: res.ok && data.success, error: data.error };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Network error' };
@@ -413,6 +491,7 @@ export async function submitTrainingSubmissionToApi(submission: any): Promise<{ 
 export async function submitCadetProfileUpdateRequestToApi(
   reqPayload: any
 ): Promise<{ success: boolean; request?: any; error?: string }> {
+  invalidateApiCache('site_settings');
   try {
     const res = await fetch(apiUrl('/api/cadets/request-update'), {
       method: 'POST',
@@ -420,6 +499,7 @@ export async function submitCadetProfileUpdateRequestToApi(
       body: JSON.stringify(reqPayload),
     });
     const data = await res.json().catch(() => ({}));
+    invalidateApiCache('site_settings');
     if (res.ok && data.success) {
       return { success: true, request: data.request || reqPayload };
     }
@@ -434,7 +514,10 @@ export async function submitCadetProfileUpdateRequestToApi(
  */
 export async function fetchPendingProfileUpdatesFromApi(): Promise<any[]> {
   try {
-    const res = await fetch(apiUrl('/api/cadets/pending-updates'));
+    const res = await fetch(apiUrl(`/api/cadets/pending-updates?_t=${Date.now()}`), {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
+    });
     if (res.ok) {
       const data = await res.json().catch(() => ({}));
       if (data && Array.isArray(data.updates)) {
@@ -452,6 +535,8 @@ export async function fetchPendingProfileUpdatesFromApi(): Promise<any[]> {
  */
 export async function registerPublicCadetToApi(cadet: Partial<CadetUserAccount>): Promise<{ success: boolean; message?: string; cadet?: any }> {
   if (!cadet) return { success: false, message: 'Invalid data' };
+  invalidateApiCache('cadets');
+  invalidateApiCache('site_settings');
 
   try {
     const res = await fetch(apiUrl('/api/cadets/register'), {
@@ -460,6 +545,8 @@ export async function registerPublicCadetToApi(cadet: Partial<CadetUserAccount>)
       body: JSON.stringify(cadet),
     });
     const data = await res.json().catch(() => ({}));
+    invalidateApiCache('cadets');
+    invalidateApiCache('site_settings');
     return { success: res.ok, message: data.message || data.error, cadet: data.cadet };
   } catch (err: any) {
     console.warn('[API Client] Public cadet registration network error:', err);
@@ -472,14 +559,17 @@ export async function registerPublicCadetToApi(cadet: Partial<CadetUserAccount>)
  */
 export async function upsertCadetToApi(cadet: CadetUserAccount): Promise<boolean> {
   if (!cadet || !cadet.id) return false;
+  invalidateApiCache('cadets');
+  invalidateApiCache('site_settings');
 
   try {
-    invalidateApiCache('cadets');
     const res = await fetch(apiUrl('/api/cadets'), {
       method: 'POST',
       headers: getRequestHeaders(),
       body: JSON.stringify(cadet),
     });
+    invalidateApiCache('cadets');
+    invalidateApiCache('site_settings');
     return res.ok;
   } catch (err) {
     console.warn(`[API Client] Failed to upsert cadet ${cadet.cadetNo}:`, err);
@@ -493,12 +583,15 @@ export async function upsertCadetToApi(cadet: CadetUserAccount): Promise<boolean
 export async function deleteCadetFromApi(id: string, _cadetNo?: string): Promise<boolean> {
   if (!id) return false;
   invalidateApiCache('cadets');
+  invalidateApiCache('site_settings');
 
   try {
     const res = await fetch(apiUrl(`/api/cadets/${encodeURIComponent(id)}`), {
       method: 'DELETE',
       headers: getRequestHeaders(),
     });
+    invalidateApiCache('cadets');
+    invalidateApiCache('site_settings');
     return res.ok;
   } catch (err) {
     console.warn(`[API Client] Failed to delete cadet ${id}:`, err);
@@ -529,38 +622,70 @@ export async function getBackendStatus(): Promise<BackendStatus | null> {
  * Delivers changes across all open phones, tablets, and computers in <2 milliseconds!
  */
 export function subscribeToBackendUpdates(
-  onUpdate: (event: { collection: 'site_settings' | 'cadets'; payload: any; action: string; type?: string }) => void
+  onUpdate?: (event: { collection: 'site_settings' | 'cadets'; payload: any; action: string; type?: string }) => void
 ): () => void {
   let isDisposed = false;
   let eventSource: EventSource | null = null;
-  let fallbackInterval: NodeJS.Timeout | null = null;
+  let reconnectTimeout: NodeJS.Timeout | null = null;
+  let heartbeatInterval: NodeJS.Timeout | null = null;
+  let reconnectAttempts = 0;
   let lastKnownVersion = 0;
 
   const handleIncomingRefresh = async () => {
     if (isDisposed) return;
     try {
-      const [settings, cadets] = await Promise.all([
-        fetchSiteSettingsFromApi(),
-        fetchCadetsFromApi(),
+      const [settings, cadets, applicants] = await Promise.all([
+        fetchSiteSettingsFromApi(true),
+        fetchCadetsFromApi(true),
+        fetchRecruitmentApplicantsFromApi(true),
       ]);
 
       if (isDisposed) return;
 
       if (settings && typeof settings === 'object') {
         Object.entries(settings).forEach(([key, value]) => {
-          onUpdate({
+          if (onUpdate) {
+            onUpdate({
+              collection: 'site_settings',
+              payload: { key, value },
+              action: 'update',
+            });
+          }
+          dispatchSyncEvent({
             collection: 'site_settings',
             payload: { key, value },
             action: 'update',
+            type: 'SETTINGS_UPDATED',
+            key,
+            value,
           });
         });
       }
 
       if (cadets && Array.isArray(cadets)) {
-        onUpdate({
+        if (onUpdate) {
+          onUpdate({
+            collection: 'cadets',
+            payload: cadets,
+            action: 'bulk',
+          });
+        }
+        dispatchSyncEvent({
           collection: 'cadets',
           payload: cadets,
           action: 'bulk',
+          type: 'BULK_CADETS_UPDATED',
+        });
+      }
+
+      if (applicants && Array.isArray(applicants)) {
+        dispatchSyncEvent({
+          collection: 'recruitment_applicants',
+          payload: { key: 'ngdc_recruitment_applicants', value: applicants },
+          action: 'update',
+          type: 'SETTINGS_UPDATED',
+          key: 'ngdc_recruitment_applicants',
+          value: applicants,
         });
       }
     } catch (err) {
@@ -580,31 +705,67 @@ export function subscribeToBackendUpdates(
     }
 
     if (event.type === 'SETTINGS_UPDATED' && event.payload) {
-      onUpdate({
+      if (onUpdate) {
+        onUpdate({
+          collection: 'site_settings',
+          payload: event.payload,
+          action: 'update',
+          type: event.type,
+        });
+      }
+      dispatchSyncEvent({
         collection: 'site_settings',
         payload: event.payload,
         action: 'update',
         type: event.type,
+        key: event.payload.key,
+        value: event.payload.value,
       });
     } else if (event.type === 'BULK_SETTINGS_UPDATED' && event.payload) {
       Object.entries(event.payload).forEach(([key, value]) => {
-        onUpdate({
+        if (onUpdate) {
+          onUpdate({
+            collection: 'site_settings',
+            payload: { key, value },
+            action: 'update',
+            type: event.type,
+          });
+        }
+        dispatchSyncEvent({
           collection: 'site_settings',
           payload: { key, value },
           action: 'update',
           type: event.type,
+          key,
+          value,
         });
       });
     } else if (event.type === 'CADETS_UPDATED' && event.payload) {
       if (Array.isArray(event.payload)) {
-        onUpdate({
+        if (onUpdate) {
+          onUpdate({
+            collection: 'cadets',
+            payload: event.payload,
+            action: 'bulk',
+            type: event.type,
+          });
+        }
+        dispatchSyncEvent({
           collection: 'cadets',
           payload: event.payload,
           action: 'bulk',
           type: event.type,
         });
       } else {
-        onUpdate({
+        if (onUpdate) {
+          onUpdate({
+            collection: 'cadets',
+            payload: event.payload,
+            action: 'update',
+            type: event.type,
+          });
+        }
+        dispatchSyncEvent({
           collection: 'cadets',
           payload: event.payload,
           action: 'update',
@@ -612,14 +773,30 @@ export function subscribeToBackendUpdates(
         });
       }
     } else if (event.type === 'RECRUITMENT_APPLICATION_SUBMITTED' && event.payload) {
-      onUpdate({
-        collection: 'site_settings',
+      if (onUpdate) {
+        onUpdate({
+          collection: 'site_settings',
+          payload: event.payload,
+          action: 'recruitment_application',
+          type: event.type,
+        });
+      }
+      dispatchSyncEvent({
+        collection: 'recruitment_applicants',
         payload: event.payload,
         action: 'recruitment_application',
         type: event.type,
       });
     } else if (event.type === 'BULK_CADETS_UPDATED') {
-      onUpdate({
+      if (onUpdate) {
+        onUpdate({
+          collection: 'cadets',
+          payload: event.payload,
+          action: 'bulk',
+          type: event.type,
+        });
+      }
+      dispatchSyncEvent({
         collection: 'cadets',
         payload: event.payload,
         action: 'bulk',
@@ -627,7 +804,15 @@ export function subscribeToBackendUpdates(
       });
       handleIncomingRefresh();
     } else if (event.type === 'CADET_DELETED' && event.payload) {
-      onUpdate({
+      if (onUpdate) {
+        onUpdate({
+          collection: 'cadets',
+          payload: event.payload,
+          action: 'delete',
+          type: event.type,
+        });
+      }
+      dispatchSyncEvent({
         collection: 'cadets',
         payload: event.payload,
         action: 'delete',
@@ -652,16 +837,22 @@ export function subscribeToBackendUpdates(
     } catch {}
   }
 
-  // 1. Live SSE Stream connection (/api/events) - only on non-serverless environments
-  const isServerless = typeof window !== 'undefined' && (
-    window.location.hostname.includes('vercel.app') ||
-    sessionStorage.getItem('ngdc_sse_disabled') === 'true'
-  );
+  // 1. Live SSE Stream connection (/api/events) with automatic exponential backoff reconnection
+  const connectSSE = () => {
+    if (isDisposed || typeof window === 'undefined' || typeof EventSource === 'undefined') return;
 
-  if (!isServerless && typeof window !== 'undefined' && typeof EventSource !== 'undefined') {
     try {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+
       const sseUrl = apiUrl('/api/events');
       eventSource = new EventSource(sseUrl);
+
+      eventSource.onopen = () => {
+        reconnectAttempts = 0;
+      };
 
       eventSource.onmessage = (ev) => {
         if (isDisposed || !ev.data) return;
@@ -674,7 +865,6 @@ export function subscribeToBackendUpdates(
         } catch {}
       };
 
-      // Close EventSource immediately on error to stop browser's auto infinite reconnect storm
       eventSource.onerror = () => {
         if (eventSource) {
           try {
@@ -682,49 +872,61 @@ export function subscribeToBackendUpdates(
           } catch {}
           eventSource = null;
         }
-        try {
-          sessionStorage.setItem('ngdc_sse_disabled', 'true');
-        } catch {}
+
+        // Resilient auto-reconnection: retry in 2s, 4s, up to 10s max backoff
+        if (!isDisposed) {
+          reconnectAttempts += 1;
+          const delay = Math.min(10000, 1500 * Math.pow(1.5, reconnectAttempts));
+          if (reconnectTimeout) clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(connectSSE, delay);
+        }
       };
     } catch {
-      try {
-        sessionStorage.setItem('ngdc_sse_disabled', 'true');
-      } catch {}
+      if (!isDisposed) {
+        reconnectAttempts += 1;
+        const delay = Math.min(10000, 2000 * Math.pow(1.5, reconnectAttempts));
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(connectSSE, delay);
+      }
     }
-  }
+  };
 
-  // 2. On-Demand Tab Visibility check (Only checks when user returns to tab, throttled to 60s)
-  let lastVisibilityCheck = Date.now();
-  const handleVisibilityChange = async () => {
-    if (isDisposed || typeof document === 'undefined') return;
-    if (document.visibilityState !== 'visible') return;
+  connectSSE();
 
-    const now = Date.now();
-    if (now - lastVisibilityCheck < 60000) return; // 60s throttle
-    lastVisibilityCheck = now;
-
+  // 2. Active 3.5-second background version polling failsafe
+  // Checks lightweight /api/version (<1ms memory response). If version changed, immediately refreshes.
+  const checkVersionAndSync = async () => {
+    if (isDisposed || typeof window === 'undefined') return;
     try {
-      const data = await fetchWithCache('version', async () => {
-        const res = await fetch(apiUrl(`/api/version?_t=${Date.now()}`), { cache: 'no-store' });
-        if (res.ok) {
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            return await res.json();
+      const res = await fetch(apiUrl(`/api/version?_t=${Date.now()}`), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' },
+      });
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data && data.version) {
+            const remoteVersion = Number(data.version || 0);
+            if (lastKnownVersion === 0) {
+              lastKnownVersion = remoteVersion;
+            } else if (remoteVersion > lastKnownVersion) {
+              lastKnownVersion = remoteVersion;
+              await handleIncomingRefresh();
+            }
           }
-        }
-        return null;
-      }, 60000);
-
-      if (data && data.version) {
-        const remoteVersion = Number(data.version || 0);
-        if (lastKnownVersion === 0) {
-          lastKnownVersion = remoteVersion;
-        } else if (remoteVersion > lastKnownVersion) {
-          lastKnownVersion = remoteVersion;
-          await handleIncomingRefresh();
         }
       }
     } catch {}
+  };
+
+  heartbeatInterval = setInterval(checkVersionAndSync, 3500);
+
+  // 3. Instant On-Demand Tab Visibility check (Whenever user returns to tab, check version immediately)
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      checkVersionAndSync();
+    }
   };
 
   if (typeof document !== 'undefined') {
@@ -739,12 +941,16 @@ export function subscribeToBackendUpdates(
       } catch {}
       eventSource = null;
     }
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }
-    if (fallbackInterval) {
-      clearInterval(fallbackInterval);
-      fallbackInterval = null;
     }
     if (broadcastChannel) {
       try {

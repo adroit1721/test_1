@@ -362,8 +362,8 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (mc) setMaintenanceConfig(JSON.parse(mc));
     } catch {}
 
-    // 2. Fetch Remote Database Settings
-    fetchSiteSettingsFromApi().then((data) => {
+    // 2. Fetch Remote Database Settings with fresh data (skip cache)
+    fetchSiteSettingsFromApi(true).then((data) => {
       if (!data) return;
       if (data.ngdc_notices && Array.isArray(data.ngdc_notices)) setNotices(data.ngdc_notices);
       if (data.ngdc_blogs && Array.isArray(data.ngdc_blogs)) setBlogs(data.ngdc_blogs);
@@ -391,6 +391,101 @@ export const SiteContentProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (data.ngdc_footer_config) setFooterConfig(data.ngdc_footer_config);
       if (data.ngdc_maintenance_config) setMaintenanceConfig(data.ngdc_maintenance_config);
     }).catch(() => {});
+
+    // 3. Real-time sync event listener
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+
+      const { key, value } = detail;
+      if (!key) return;
+
+      switch (key) {
+        case 'ngdc_notices':
+          if (Array.isArray(value)) setNotices(value);
+          break;
+        case 'ngdc_blogs':
+          if (Array.isArray(value)) setBlogs(value);
+          break;
+        case 'ngdc_memories':
+          if (Array.isArray(value)) setMemories(value);
+          break;
+        case 'ngdc_honor_entries':
+          if (Array.isArray(value)) setHonorEntries(value);
+          break;
+        case 'ngdc_hero_slides':
+          if (Array.isArray(value)) setHeroSlides(value);
+          break;
+        case 'ngdc_header_left_logo':
+          if (typeof value === 'string') setHeaderLeftLogoUrl(value);
+          break;
+        case 'ngdc_header_right_logo':
+          if (typeof value === 'string') setHeaderRightLogoUrl(value);
+          break;
+        case 'ngdc_header_title':
+          if (typeof value === 'string') setHeaderTitle(value);
+          break;
+        case 'ngdc_header_subtitle':
+          if (typeof value === 'string') setHeaderSubtitle(value);
+          break;
+        case 'ngdc_site_favicon':
+          if (typeof value === 'string') setSiteFavicon(value);
+          break;
+        case 'ngdc_principal_message':
+          if (value) setPrincipalMessage(value);
+          break;
+        case 'ngdc_vice_principal_message':
+          if (value) setVicePrincipalMessage(value);
+          break;
+        case 'ngdc_about_overview':
+          if (value) setAboutOverview(value);
+          break;
+        case 'ngdc_bncco1_message':
+          if (value) setBncco1Message(value);
+          break;
+        case 'ngdc_bncco2_message':
+          if (value) setBncco2Message(value);
+          break;
+        case 'ngdc_platoon_commander_message':
+          if (value) setPlatoonCommanderMessage(value);
+          break;
+        case 'ngdc_about_sections':
+          if (Array.isArray(value)) setAboutSections(value);
+          break;
+        case 'ngdc_trainings':
+          if (Array.isArray(value)) setTrainingAnnouncements(value);
+          break;
+        case 'ngdc_training_form_fields':
+          if (Array.isArray(value)) setTrainingFormFields(value);
+          break;
+        case 'ngdc_training_submissions':
+          if (Array.isArray(value)) setTrainingSubmissions(value);
+          break;
+        case 'ngdc_platoon_routine':
+          if (value) setPlatoonRoutineConfig(value);
+          break;
+        case 'ngdc_contact_config':
+          if (value) setContactConfig(value);
+          break;
+        case 'ngdc_contact_messages':
+          if (Array.isArray(value)) setContactMessages(value);
+          break;
+        case 'ngdc_footer_config':
+          if (value) setFooterConfig(value);
+          break;
+        case 'ngdc_maintenance_config':
+          if (value) setMaintenanceConfig(value);
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('ngdc-sync-event', handleSync);
+    return () => {
+      window.removeEventListener('ngdc-sync-event', handleSync);
+    };
   }, []);
 
   const saveSetting = (key: string, val: any) => {

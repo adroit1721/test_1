@@ -66,9 +66,21 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
     };
   }, []);
 
-  // Direct, clean 2-Page PDF file download using jsPDF + html-to-image
+  // Direct, clean 2-Page PDF file download with iOS native handling
   const handleDownloadPdf = async () => {
     if (!page1Ref.current || !page2Ref.current) return;
+
+    // Cross-platform detection: on iOS (iPhone 8+, iPad), native printing provides pure vector PDF without canvas memory limits
+    const isIOS =
+      typeof navigator !== 'undefined' &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    if (isIOS) {
+      handlePrint();
+      return;
+    }
+
     setIsGeneratingPdf(true);
     setPdfStatus('Rendering PDF...');
 
@@ -106,21 +118,15 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
       pdf.addPage('a4', 'portrait');
       pdf.addImage(imgData2, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
 
-      // Cross-platform universal file saving engine (iOS Safari, Android Chrome, Windows, Mac)
-      const isIOS =
-        typeof navigator !== 'undefined' &&
-        (/iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-
       const isAndroid =
         typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
 
       const pdfBlob = pdf.output('blob');
 
-      // Direct Web Share API for Mobile devices (iOS Safari & Android Chrome native share sheet) if available
+      // Direct Web Share API for Mobile devices if available
       let sharedSuccessfully = false;
       if (
-        (isIOS || isAndroid) &&
+        isAndroid &&
         typeof navigator !== 'undefined' &&
         navigator.share &&
         typeof File !== 'undefined'
@@ -145,21 +151,7 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
       }
 
       if (!sharedSuccessfully) {
-        if (isIOS) {
-          const blobUrl = URL.createObjectURL(pdfBlob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename;
-          link.target = '_blank';
-          document.body.appendChild(link);
-          link.click();
-          setTimeout(() => {
-            document.body.removeChild(link);
-            URL.revokeObjectURL(blobUrl);
-          }, 3000);
-        } else {
-          pdf.save(filename);
-        }
+        pdf.save(filename);
       }
 
       setPdfStatus('PDF ready & downloaded successfully!');
@@ -875,12 +867,21 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
 
                 {/* Column 2: Countersigned Authority (PUO / Platoon Commander) */}
                 <div className="flex flex-col items-center w-full border-x border-gray-200 px-2">
-                  <div className="h-14 flex items-end justify-center w-full pb-1">
+                  <div className="h-14 flex items-end justify-center w-full pb-1 overflow-visible">
                     {sig.countersignedSignatureUrl ? (
                       <img
                         src={sig.countersignedSignatureUrl}
                         alt="Countersigned Authority Signature"
-                        className="max-h-12 max-w-[130px] object-contain"
+                        className="signature-img"
+                        style={{
+                          maxHeight: '48px',
+                          maxWidth: '120px',
+                          width: 'auto',
+                          height: 'auto',
+                          objectFit: 'contain',
+                          display: 'block',
+                          margin: '0 auto',
+                        }}
                         referrerPolicy="no-referrer"
                       />
                     ) : (
@@ -904,12 +905,21 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
 
                 {/* Column 3: Signature of Platoon Senior Cadet */}
                 <div className="flex flex-col items-center w-full">
-                  <div className="h-14 flex items-end justify-center w-full pb-1">
+                  <div className="h-14 flex items-end justify-center w-full pb-1 overflow-visible">
                     {sig.seniorCadetSignatureUrl ? (
                       <img
                         src={sig.seniorCadetSignatureUrl}
                         alt="Platoon Senior Cadet Signature"
-                        className="max-h-12 max-w-[130px] object-contain"
+                        className="signature-img"
+                        style={{
+                          maxHeight: '48px',
+                          maxWidth: '120px',
+                          width: 'auto',
+                          height: 'auto',
+                          objectFit: 'contain',
+                          display: 'block',
+                          margin: '0 auto',
+                        }}
                         referrerPolicy="no-referrer"
                       />
                     ) : (
@@ -1017,6 +1027,17 @@ export const RecruitmentApplicationSlipA4: React.FC<RecruitmentApplicationSlipA4
         .slip-a4-page:last-of-type {
           page-break-after: avoid !important;
           break-after: avoid !important;
+        }
+        .signature-img {
+          max-height: 48px !important;
+          max-width: 120px !important;
+          width: auto !important;
+          height: auto !important;
+          object-fit: contain !important;
+          display: block !important;
+          margin: 0 auto !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
       }
     `}</style>

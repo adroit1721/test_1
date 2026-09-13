@@ -11,6 +11,8 @@ import {
   fetchRecruitmentApplicantsFromApi,
   submitRecruitmentApplicationToApi,
   deleteRecruitmentApplicantFromApi,
+  fetchSiteSettingsFromApi,
+  upsertSiteSettingToApi,
 } from '../utils/apiClient';
 
 const localStorage = {
@@ -124,6 +126,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const setIsRecruitmentOpen = (open: boolean) => {
     setIsRecruitmentOpenState(open);
     try { localStorage.setItem('ngdc_recruitment_open', String(open)); } catch {}
+    upsertSiteSettingToApi('ngdc_recruitment_open', open);
   };
 
   const [recruitmentNoticeTitleState, setRecruitmentNoticeTitleState] = useState<string>(() => {
@@ -137,6 +140,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const setRecruitmentNoticeTitle = (title: string) => {
     setRecruitmentNoticeTitleState(title);
     try { localStorage.setItem('ngdc_recruitment_notice_title', title); } catch {}
+    upsertSiteSettingToApi('ngdc_recruitment_notice_title', title);
   };
 
   const [recruitmentAnnouncement, setRecruitmentAnnouncement] = useState<RecruitmentAnnouncementConfig | null>(() => {
@@ -153,6 +157,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setRecruitmentAnnouncement((prev) => {
       const next = ann ? ({ ...(prev || DEFAULT_RECRUITMENT_ANNOUNCEMENT), ...ann } as RecruitmentAnnouncementConfig) : null;
       try { localStorage.setItem('ngdc_recruitment_announcement', JSON.stringify(next)); } catch {}
+      upsertSiteSettingToApi('ngdc_recruitment_announcement', next);
       return next;
     });
   };
@@ -160,6 +165,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const deleteRecruitmentAnnouncement = () => {
     setRecruitmentAnnouncement(null);
     try { localStorage.removeItem('ngdc_recruitment_announcement'); } catch {}
+    upsertSiteSettingToApi('ngdc_recruitment_announcement', null);
   };
 
   const [recruitmentFields, setRecruitmentFieldsState] = useState<FormFieldConfig[]>(() => {
@@ -179,6 +185,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setRecruitmentFieldsState((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
       try { localStorage.setItem('ngdc_recruitment_fields', JSON.stringify(next)); } catch {}
+      upsertSiteSettingToApi('ngdc_recruitment_fields', next);
       return next;
     });
   }, []);
@@ -199,11 +206,12 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const saveApplicants = (list: RecruitmentApplicant[]) => {
     setRecruitmentApplicants(list);
     try { localStorage.setItem('ngdc_recruitment_applicants', JSON.stringify(list)); } catch {}
+    upsertSiteSettingToApi('ngdc_recruitment_applicants', list);
   };
 
   const refreshRecruitmentApplicants = useCallback(async () => {
     try {
-      const dbApps = await fetchRecruitmentApplicantsFromApi();
+      const dbApps = await fetchRecruitmentApplicantsFromApi(true);
       if (Array.isArray(dbApps)) {
         setRecruitmentApplicants(dbApps);
         try { localStorage.setItem('ngdc_recruitment_applicants', JSON.stringify(dbApps)); } catch {}
@@ -215,6 +223,70 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   useEffect(() => {
     refreshRecruitmentApplicants();
+
+    // Fetch initial recruitment settings from server to sync immediately
+    fetchSiteSettingsFromApi(true).then((settings) => {
+      if (settings) {
+        if (settings.ngdc_recruitment_open !== undefined) {
+          setIsRecruitmentOpenState(Boolean(settings.ngdc_recruitment_open));
+        }
+        if (typeof settings.ngdc_recruitment_notice_title === 'string') {
+          setRecruitmentNoticeTitleState(settings.ngdc_recruitment_notice_title);
+        }
+        if (settings.ngdc_recruitment_announcement !== undefined) {
+          setRecruitmentAnnouncement(settings.ngdc_recruitment_announcement);
+        }
+        if (Array.isArray(settings.ngdc_recruitment_fields) && settings.ngdc_recruitment_fields.length > 0) {
+          setRecruitmentFieldsState(settings.ngdc_recruitment_fields);
+        }
+        if (settings.ngdc_recruitment_signatories) {
+          setRecruitmentSignatories(settings.ngdc_recruitment_signatories);
+        }
+        if (Array.isArray(settings.ngdc_recruitment_applicants)) {
+          setRecruitmentApplicants(settings.ngdc_recruitment_applicants);
+        }
+      }
+    }).catch(() => {});
+
+    // Listen for real-time sync events
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (!detail) return;
+
+      if (detail.key === 'ngdc_recruitment_open') {
+        setIsRecruitmentOpenState(Boolean(detail.value));
+      } else if (detail.key === 'ngdc_recruitment_notice_title' && typeof detail.value === 'string') {
+        setRecruitmentNoticeTitleState(detail.value);
+      } else if (detail.key === 'ngdc_recruitment_announcement') {
+        setRecruitmentAnnouncement(detail.value);
+      } else if (detail.key === 'ngdc_recruitment_fields' && Array.isArray(detail.value)) {
+        setRecruitmentFieldsState(detail.value);
+      } else if (detail.key === 'ngdc_recruitment_signatories' && detail.value) {
+        setRecruitmentSignatories(detail.value);
+      } else if (detail.key === 'ngdc_recruitment_applicants' && Array.isArray(detail.value)) {
+        setRecruitmentApplicants(detail.value);
+        try { localStorage.setItem('ngdc_recruitment_applicants', JSON.stringify(detail.value)); } catch {}
+      } else if (detail.type === 'RECRUITMENT_APPLICATION_SUBMITTED' || detail.action === 'recruitment_application') {
+        const applicant = detail.payload?.applicant;
+        if (applicant) {
+          setRecruitmentApplicants((prev) => {
+            const exists = prev.some((a) => (a.id && a.id === applicant.id) || (a.token && a.token === applicant.token));
+            if (exists) {
+              return prev.map((a) => ((a.id && a.id === applicant.id) || (a.token && a.token === applicant.token) ? { ...a, ...applicant } : a));
+            }
+            const next = [applicant, ...prev];
+            try { localStorage.setItem('ngdc_recruitment_applicants', JSON.stringify(next)); } catch {}
+            return next;
+          });
+        }
+      }
+    };
+
+    window.addEventListener('ngdc-sync-event', handleSync);
+    return () => {
+      window.removeEventListener('ngdc-sync-event', handleSync);
+    };
   }, [refreshRecruitmentApplicants]);
 
   const addRecruitmentApplicant = (applicant: Omit<RecruitmentApplicant, 'id' | 'token' | 'appliedAt' | 'status'>) => {
@@ -274,6 +346,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setRecruitmentSignatories((prev) => {
       const next = { ...prev, ...config };
       try { localStorage.setItem('ngdc_recruitment_signatories', JSON.stringify(next)); } catch {}
+      upsertSiteSettingToApi('ngdc_recruitment_signatories', next);
       return next;
     });
   };
@@ -281,6 +354,7 @@ export const RecruitmentProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const resetRecruitmentSignatories = () => {
     setRecruitmentSignatories(DEFAULT_RECRUITMENT_SIGNATORIES);
     try { localStorage.removeItem('ngdc_recruitment_signatories'); } catch {}
+    upsertSiteSettingToApi('ngdc_recruitment_signatories', DEFAULT_RECRUITMENT_SIGNATORIES);
   };
 
   const exportApplicantsToExcel = () => {
