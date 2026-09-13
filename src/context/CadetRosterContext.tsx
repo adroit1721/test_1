@@ -468,50 +468,45 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (targetCadetNo) lastLocalWriteTimestamps.current[targetCadetNo] = now;
     if (origCadetNo) lastLocalWriteTimestamps.current[origCadetNo] = now;
 
-    let updatedCadetRef: CadetUserAccount | null = null;
+    const existing = cadetUsers.find((u) => {
+      if (!u) return false;
+      if (targetId && String(u.id || '').trim() === targetId) return true;
+      if (origCadetNo && String(u.cadetNo || '').trim().toUpperCase() === origCadetNo) return true;
+      if (targetCadetNo && String(u.cadetNo || '').trim().toUpperCase() === targetCadetNo) return true;
+      return false;
+    });
+
+    const category = (user.category || user.platoon || existing?.category || existing?.platoon || 'Male Platoon') as PlatoonCategory;
+    const platoon = (user.platoon || user.category || existing?.platoon || existing?.category || 'Male Platoon') as any;
+    const rank = user.rank || existing?.rank || 'Cadet (CDT)';
+    const status = user.status || existing?.status || 'Active';
+    const isApproved = user.isApproved !== undefined ? user.isApproved : (existing?.isApproved !== undefined ? existing.isApproved : true);
+
+    const canonicalId =
+      (existing?.id && !/^\d{6,}$/.test(String(existing.id)))
+        ? existing.id
+        : (targetId && !/^\d{6,}$/.test(targetId))
+        ? targetId
+        : (existing?.id || targetId || `usr-${Date.now()}`);
+
+    const updatedCadet: CadetUserAccount = {
+      ...(existing || {}),
+      ...user,
+      id: canonicalId,
+      cadetNo: targetCadetNo || origCadetNo || existing?.cadetNo || `NGDC-${Math.floor(1000 + Math.random() * 9000)}`,
+      password: user.password || existing?.password || 'cadet123',
+      name: user.name || existing?.name || 'Cadet',
+      category,
+      platoon,
+      rank,
+      status,
+      isApproved,
+    } as CadetUserAccount;
+
+    if (updatedCadet.id) lastLocalWriteTimestamps.current[updatedCadet.id] = now;
+    if (updatedCadet.cadetNo) lastLocalWriteTimestamps.current[updatedCadet.cadetNo.trim().toUpperCase()] = now;
 
     setCadetUsersAndSave((prev) => {
-      const existing = prev.find((u) => {
-        if (!u) return false;
-        if (targetId && String(u.id || '').trim() === targetId) return true;
-        if (origCadetNo && String(u.cadetNo || '').trim().toUpperCase() === origCadetNo) return true;
-        if (targetCadetNo && String(u.cadetNo || '').trim().toUpperCase() === targetCadetNo) return true;
-        return false;
-      });
-
-      const category = (user.category || user.platoon || existing?.category || existing?.platoon || 'Male Platoon') as PlatoonCategory;
-      const platoon = (user.platoon || user.category || existing?.platoon || existing?.category || 'Male Platoon') as any;
-      const rank = user.rank || existing?.rank || 'Cadet (CDT)';
-      const status = user.status || existing?.status || 'Active';
-      const isApproved = user.isApproved !== undefined ? user.isApproved : (existing?.isApproved !== undefined ? existing.isApproved : true);
-
-      // Prioritize preserving existing canonical ID so updates never fork or duplicate in MongoDB
-      const canonicalId =
-        (existing?.id && !/^\d{6,}$/.test(String(existing.id)))
-          ? existing.id
-          : (targetId && !/^\d{6,}$/.test(targetId))
-          ? targetId
-          : (existing?.id || targetId || `usr-${Date.now()}`);
-
-      const updatedCadet: CadetUserAccount = {
-        ...(existing || {}),
-        ...user,
-        id: canonicalId,
-        cadetNo: targetCadetNo || origCadetNo || existing?.cadetNo || `NGDC-${Math.floor(1000 + Math.random() * 9000)}`,
-        password: user.password || existing?.password || 'cadet123',
-        name: user.name || existing?.name || 'Cadet',
-        category,
-        platoon,
-        rank,
-        status,
-        isApproved,
-      } as CadetUserAccount;
-
-      updatedCadetRef = updatedCadet;
-
-      if (updatedCadet.id) lastLocalWriteTimestamps.current[updatedCadet.id] = now;
-      if (updatedCadet.cadetNo) lastLocalWriteTimestamps.current[updatedCadet.cadetNo.trim().toUpperCase()] = now;
-
       let found = false;
       const next = prev.map((u) => {
         if (!u) return u;
@@ -536,7 +531,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if ((targetId && activeId === targetId) || (targetCadetNo && activeNo === targetCadetNo)) {
         setActiveCadetAuth((prevAuth) => {
           if (!prevAuth) return null;
-          const updatedAuth = { ...prevAuth, ...user, ...updatedCadetRef };
+          const updatedAuth = { ...prevAuth, ...user, ...updatedCadet };
           try {
             sessionStorage.setItem('ngdc_active_cadet_auth', JSON.stringify(updatedAuth));
           } catch {}
@@ -545,14 +540,14 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
 
-    if (updatedCadetRef) {
+    setTimeout(() => {
       try {
-        upsertCadetToApi(updatedCadetRef);
+        upsertCadetToApi(updatedCadet);
       } catch (err) {
         console.warn('Failed to update cadet in API:', err);
       }
-    }
-  }, [removeCadetTombstone, setCadetUsersAndSave, activeCadetAuth]);
+    }, 0);
+  }, [removeCadetTombstone, setCadetUsersAndSave, activeCadetAuth, cadetUsers]);
 
   const deleteCadetUser = useCallback((id: string, cadetNo?: string) => {
     const normalizedId = String(id || '').trim();
@@ -578,57 +573,57 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const now = Date.now();
     if (targetId) lastLocalWriteTimestamps.current[targetId] = now;
 
-    let finalApprovedCadet: CadetUserAccount | null = null;
+    const existing = cadetUsers.find((c) => c && targetId && String(c.id).trim() === targetId);
+    const targetCategory: PlatoonCategory = options.category || (existing ? existing.category : 'Male Platoon') || 'Male Platoon';
+    const isExCadet = (existing && existing.cadetType === 'Ex-cadet') || targetCategory === 'Ex-cadets';
+
+    const approved: CadetUserAccount = existing
+      ? {
+          ...existing,
+          cadetNo: options.cadetNo?.trim() || existing.cadetNo,
+          password: options.password?.trim() || existing.password || 'cadet123',
+          category: targetCategory,
+          platoon: isExCadet ? 'Ex-cadets Alumni' : targetCategory,
+          section: options.section || existing.section || 'Section 01',
+          rank: options.rank || existing.rank || 'Cadet (CDT)',
+          status: isExCadet ? 'Alumni' : 'Active',
+          cadetType: isExCadet ? 'Ex-cadet' : 'Current',
+          isApproved: true,
+        }
+      : {
+          id: targetId || `usr-${Date.now()}`,
+          cadetNo: options.cadetNo?.trim() || `NGDC-${Math.floor(1000 + Math.random() * 9000)}`,
+          password: options.password?.trim() || 'cadet123',
+          name: 'Cadet',
+          category: targetCategory,
+          platoon: isExCadet ? 'Ex-cadets Alumni' : targetCategory,
+          section: options.section || 'Section 01',
+          rank: options.rank || 'Cadet (CDT)',
+          status: isExCadet ? 'Alumni' : 'Active',
+          cadetType: isExCadet ? 'Ex-cadet' : 'Current',
+          isApproved: true,
+          gender: targetCategory === 'Female Platoon' ? 'Female' : 'Male',
+          appointment: 'Cadet Trainee',
+          batch: 'Batch 24',
+          collegeId: '',
+          department: '',
+          bloodGroup: 'B+',
+          phone: '',
+          email: '',
+          joiningDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+          attendancePercentage: 100,
+          paradesAttended: 24,
+          totalParades: 24,
+          campsAttended: [],
+          certificates: [],
+          avatarUrl: '',
+        };
+
+    if (approved.cadetNo) {
+      lastLocalWriteTimestamps.current[approved.cadetNo.trim().toUpperCase()] = now;
+    }
 
     setCadetUsersAndSave((prev) => {
-      const existing = prev.find((c) => c && targetId && String(c.id).trim() === targetId);
-      const targetCategory: PlatoonCategory = options.category || (existing ? existing.category : 'Male Platoon') || 'Male Platoon';
-      const isExCadet = (existing && existing.cadetType === 'Ex-cadet') || targetCategory === 'Ex-cadets';
-
-      const approved: CadetUserAccount = existing
-        ? {
-            ...existing,
-            cadetNo: options.cadetNo?.trim() || existing.cadetNo,
-            password: options.password?.trim() || existing.password || 'cadet123',
-            category: targetCategory,
-            platoon: isExCadet ? 'Ex-cadets Alumni' : targetCategory,
-            section: options.section || existing.section || 'Section 01',
-            rank: options.rank || existing.rank || 'Cadet (CDT)',
-            status: isExCadet ? 'Alumni' : 'Active',
-            cadetType: isExCadet ? 'Ex-cadet' : 'Current',
-            isApproved: true,
-          }
-        : {
-            id: targetId || `usr-${Date.now()}`,
-            cadetNo: options.cadetNo?.trim() || `NGDC-${Math.floor(1000 + Math.random() * 9000)}`,
-            password: options.password?.trim() || 'cadet123',
-            name: 'Cadet',
-            category: targetCategory,
-            platoon: isExCadet ? 'Ex-cadets Alumni' : targetCategory,
-            section: options.section || 'Section 01',
-            rank: options.rank || 'Cadet (CDT)',
-            status: isExCadet ? 'Alumni' : 'Active',
-            cadetType: isExCadet ? 'Ex-cadet' : 'Current',
-            isApproved: true,
-            gender: targetCategory === 'Female Platoon' ? 'Female' : 'Male',
-            appointment: 'Cadet Trainee',
-            batch: 'Batch 24',
-            collegeId: '',
-            department: '',
-            bloodGroup: 'B+',
-            phone: '',
-            email: '',
-            joiningDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-            attendancePercentage: 100,
-            paradesAttended: 24,
-            totalParades: 24,
-            campsAttended: [],
-            certificates: [],
-            avatarUrl: '',
-          };
-
-      finalApprovedCadet = approved;
-
       let found = false;
       const next = prev.map((c) => {
         if (c && targetId && String(c.id).trim() === targetId) {
@@ -640,18 +635,14 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return found ? next : [approved, ...next];
     });
 
-    if (finalApprovedCadet) {
-      const cadet = finalApprovedCadet as CadetUserAccount;
-      if (cadet.cadetNo) {
-        lastLocalWriteTimestamps.current[cadet.cadetNo.trim().toUpperCase()] = now;
-      }
+    setTimeout(() => {
       try {
-        await upsertCadetToApi(cadet);
+        upsertCadetToApi(approved);
       } catch (err) {
         console.warn('Failed to upsert approved cadet to API:', err);
       }
-    }
-  }, [removeCadetTombstone, setCadetUsersAndSave]);
+    }, 0);
+  }, [removeCadetTombstone, setCadetUsersAndSave, cadetUsers]);
 
   const clearAllCadetUsers = useCallback(() => {
     cadetUsers.forEach((c) => addCadetTombstone(c.id));
