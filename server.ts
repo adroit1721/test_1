@@ -215,10 +215,44 @@ const ContactMessageModel: any = mongoose.models.ContactMessage || mongoose.mode
 
 // --- High-Speed In-Memory Cache (Pre-Seeded with Canonical Defaults) ---
 // Guarantees any connected device receives full data on first hit, even before DB connects!
+export function deduplicateCadetList(list: any[]): any[] {
+  if (!Array.isArray(list)) return [];
+  const byCadetNo = new Map<string, any>();
+  const byId = new Map<string, any>();
+
+  for (const c of list) {
+    if (!c) continue;
+    const cId = String(c.id || '').trim();
+    const cNo = String(c.cadetNo || c.cadetNumber || '').trim().toUpperCase();
+
+    const existing = (cNo && byCadetNo.get(cNo)) || (cId && byId.get(cId));
+    if (existing) {
+      const canonicalId =
+        (existing.id && (String(existing.id).startsWith('usr-') || !/^\d{6,}$/.test(String(existing.id))))
+          ? existing.id
+          : (cId && (cId.startsWith('usr-') || !/^\d{6,}$/.test(cId))) ? cId : (existing.id || cId);
+
+      const merged = { ...existing, ...c, id: canonicalId };
+      if (cNo) byCadetNo.set(cNo, merged);
+      byId.set(canonicalId, merged);
+      if (existing.id && existing.id !== canonicalId) byId.delete(existing.id);
+      if (cId && cId !== canonicalId) byId.delete(cId);
+    } else {
+      if (cNo) byCadetNo.set(cNo, c);
+      if (cId) byId.set(cId, c);
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 let cachedSettings: Record<string, any> = { ...getDefaultSiteSettings(), ...CANONICAL_SETTINGS };
-let cachedCadets: any[] = CANONICAL_CADETS.length > 0 ? [...CANONICAL_CADETS] : (INITIAL_CADET_USERS || []);
+let rawInitialCadets: any[] = CANONICAL_CADETS.length > 0 ? [...CANONICAL_CADETS] : (INITIAL_CADET_USERS || []);
+let cachedCadets: any[] = deduplicateCadetList(rawInitialCadets);
 if (!cachedSettings['ngdc_cadet_users_v8'] || cachedSettings['ngdc_cadet_users_v8'].length === 0) {
   cachedSettings['ngdc_cadet_users_v8'] = cachedCadets;
+} else {
+  cachedSettings['ngdc_cadet_users_v8'] = deduplicateCadetList(cachedSettings['ngdc_cadet_users_v8']);
 }
 let syncVersion: number = Date.now();
 let isMongoConnected = false;
@@ -492,13 +526,14 @@ async function hydrateCacheFromDb(): Promise<void> {
           const id = String(c?.id || '').trim();
           return !id.startsWith('c-male-') && !id.startsWith('c-female-') && !id.startsWith('c-band-');
         });
-        cachedCadets = list;
-        cachedSettings['ngdc_cadet_users_v8'] = list;
+        const cleanList = deduplicateCadetList(list);
+        cachedCadets = cleanList;
+        cachedSettings['ngdc_cadet_users_v8'] = cleanList;
       } else if (cachedSettings['ngdc_cadet_users_v8'] && Array.isArray(cachedSettings['ngdc_cadet_users_v8'])) {
-        cachedCadets = cachedSettings['ngdc_cadet_users_v8'].filter((c: any) => {
+        cachedCadets = deduplicateCadetList(cachedSettings['ngdc_cadet_users_v8'].filter((c: any) => {
           const id = String(c?.id || '').trim();
           return !id.startsWith('c-male-') && !id.startsWith('c-female-') && !id.startsWith('c-band-');
-        });
+        }));
         cachedSettings['ngdc_cadet_users_v8'] = cachedCadets;
       } else {
         cachedCadets = [];
@@ -506,6 +541,7 @@ async function hydrateCacheFromDb(): Promise<void> {
       }
 
       isCacheHydrated = true;
+      cleanDuplicateCadetsInMongo().catch(() => {});
     } catch (err: any) {
       console.warn('[MongoDB Atlas] Hydration warning:', err?.message || err);
     } finally {
@@ -514,6 +550,42 @@ async function hydrateCacheFromDb(): Promise<void> {
   })();
 
   return hydrationPromise;
+}
+
+// Background cleanup worker for duplicate MongoDB records
+async function cleanDuplicateCadetsInMongo() {
+  if (mongoose.connection.readyState !== 1) return;
+  try {
+    const allCadets = await CadetModel.find({}).lean();
+    if (!allCadets || allCadets.length === 0) return;
+
+    const seenCadetNos = new Map<string, any>();
+    const idsToDelete: any[] = [];
+
+    for (const doc of allCadets) {
+      const cNo = String(doc.cadetNo || (doc as any).cadetNumber || '').trim().toUpperCase();
+      if (!cNo) continue;
+      if (seenCadetNos.has(cNo)) {
+        const existing = seenCadetNos.get(cNo);
+        // Prefer keeping record with usr- prefixed id
+        if (String(doc.id).startsWith('usr-') && !String(existing.id).startsWith('usr-')) {
+          idsToDelete.push(existing._id);
+          seenCadetNos.set(cNo, doc);
+        } else {
+          idsToDelete.push(doc._id);
+        }
+      } else {
+        seenCadetNos.set(cNo, doc);
+      }
+    }
+
+    if (idsToDelete.length > 0) {
+      console.log(`[MongoDB] Purging ${idsToDelete.length} duplicate cadet records from database...`);
+      await CadetModel.deleteMany({ _id: { $in: idsToDelete } });
+    }
+  } catch (err) {
+    console.warn('[MongoDB] Cleanup duplicates error:', err);
+  }
 }
 
 // Connect to MongoDB Atlas (reusing cached connection across serverless invocations)
@@ -1072,24 +1144,38 @@ app.post('/api/cadets/register', async (req, res) => {
       return res.status(400).json({ error: 'Cadet name is required' });
     }
 
-    const cadetId = String(cadet.id || `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`).trim();
-    const cleanCadet = {
-      ...cadet,
-      id: cadetId,
-      status: cadet.status || 'Pending Approval',
-      isApproved: false,
-      createdAt: new Date(),
-    };
+    const rawNo = cadet.cadetNo ? String(cadet.cadetNo).trim().toUpperCase() : '';
+    const providedId = cadet.id ? String(cadet.id).trim() : '';
 
     const existingIndex = cachedCadets.findIndex(
-      (c) => String(c.id || '').trim() === cadetId || (cleanCadet.cadetNo && c.cadetNo === cleanCadet.cadetNo)
+      (c) =>
+        (providedId && String(c.id || '').trim() === providedId) ||
+        (rawNo && String(c.cadetNo || c.cadetNumber || '').trim().toUpperCase() === rawNo)
     );
 
+    let targetId = providedId;
+    if (existingIndex >= 0 && cachedCadets[existingIndex].id) {
+      targetId = cachedCadets[existingIndex].id;
+    }
+    if (!targetId) {
+      targetId = `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    const cleanCadet = {
+      ...(existingIndex >= 0 ? cachedCadets[existingIndex] : {}),
+      ...cadet,
+      id: targetId,
+      status: cadet.status || 'Pending Approval',
+      isApproved: false,
+      createdAt: existingIndex >= 0 && cachedCadets[existingIndex].createdAt ? cachedCadets[existingIndex].createdAt : new Date(),
+    };
+
     if (existingIndex >= 0) {
-      cachedCadets[existingIndex] = { ...cachedCadets[existingIndex], ...cleanCadet };
+      cachedCadets[existingIndex] = cleanCadet;
     } else {
       cachedCadets.unshift(cleanCadet);
     }
+    cachedCadets = deduplicateCadetList(cachedCadets);
     cachedSettings['ngdc_cadet_users_v8'] = [...cachedCadets];
     syncVersion = Date.now();
 
@@ -1107,9 +1193,13 @@ app.post('/api/cadets/register', async (req, res) => {
         const rawData = { ...cleanCadet };
         delete (rawData as any)._id;
 
+        const filter = rawNo
+          ? { $or: [{ id: targetId }, { cadetNo: rawNo }] }
+          : { id: targetId };
+
         await CadetModel.findOneAndUpdate(
-          { id: cadetId },
-          { ...cleanCadet, rawData, updatedAt: new Date() },
+          filter,
+          { ...cleanCadet, rawData, id: targetId, updatedAt: new Date() },
           { upsert: true, returnDocument: 'after' }
         );
 
@@ -1126,7 +1216,7 @@ app.post('/api/cadets/register', async (req, res) => {
         );
       }
     } catch (dbErr) {
-      console.warn(`[MongoDB] Failed to persist applicant cadet ${cadetId}:`, dbErr);
+      console.warn(`[MongoDB] Failed to persist applicant cadet ${targetId}:`, dbErr);
     }
 
     res.json({ success: true, cadet: cleanCadet, message: 'Application submitted for Admin review', version: syncVersion });
@@ -1184,7 +1274,7 @@ app.all('/api/cadets/request-update', async (req, res) => {
       cadetName: cadetName || cadet?.fullName || cadet?.name || 'Cadet',
       changes: cleanChanges,
       requestedAt: requestedAt || new Date().toISOString(),
-      status: status || 'pending',
+      status: 'pending', // Standardize to lowercase pending
     };
 
     let currentUpdates: any[] = [];
@@ -1194,7 +1284,13 @@ app.all('/api/cadets/request-update', async (req, res) => {
 
     const nextList = [
       newRequest,
-      ...currentUpdates.filter((r: any) => (r.cadetNo && r.cadetNo.toUpperCase() !== newRequest.cadetNo.toUpperCase()) || r.status !== 'pending'),
+      ...currentUpdates.filter((r: any) => {
+        const rNo = String(r.cadetNo || '').trim().toUpperCase();
+        const rId = String(r.id || '').trim();
+        if (rId === newRequest.id) return false;
+        if (rNo && rNo === newRequest.cadetNo) return false;
+        return true;
+      }),
     ];
 
     cachedSettings['ngdc_cadet_pending_updates'] = nextList;
@@ -1227,6 +1323,116 @@ app.all('/api/cadets/request-update', async (req, res) => {
     res.json({ success: true, message: 'Profile update request received', request: newRequest });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to process profile update request' });
+  }
+});
+
+// Resolve or reject a pending profile update
+const resolvePendingUpdateHandler = async (req: express.Request, res: express.Response) => {
+  try {
+    const targetId = String(req.params.id || '').trim();
+    if (!targetId) {
+      return res.status(400).json({ error: 'Update request ID is required' });
+    }
+
+    let currentUpdates: any[] = [];
+    if (Array.isArray(cachedSettings['ngdc_cadet_pending_updates'])) {
+      currentUpdates = [...cachedSettings['ngdc_cadet_pending_updates']];
+    }
+
+    const remaining = currentUpdates.filter((r: any) => String(r.id || '').trim() !== targetId);
+    cachedSettings['ngdc_cadet_pending_updates'] = remaining;
+    syncVersion = Date.now();
+
+    broadcastRealtime({
+      type: 'SETTINGS_UPDATED',
+      payload: { key: 'ngdc_cadet_pending_updates', value: remaining },
+      version: syncVersion,
+    });
+
+    try {
+      await initMongoConnection();
+      if (mongoose.connection.readyState === 1) {
+        await SettingModel.findOneAndUpdate(
+          { key: 'ngdc_cadet_pending_updates' },
+          { key: 'ngdc_cadet_pending_updates', value: remaining, updatedAt: new Date() },
+          { upsert: true, returnDocument: 'after' }
+        );
+        await SettingModel.findOneAndUpdate(
+          { key: 'ngdc_sync_version' },
+          { key: 'ngdc_sync_version', value: syncVersion, updatedAt: new Date() },
+          { upsert: true, returnDocument: 'after' }
+        );
+      }
+    } catch (dbErr) {
+      console.warn('[MongoDB] Save resolved pending profile update warning:', dbErr);
+    }
+
+    res.json({ success: true, remainingCount: remaining.length, version: syncVersion });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to resolve pending update' });
+  }
+};
+
+app.all('/api/cadets/pending-updates/:id/resolve', resolvePendingUpdateHandler);
+app.delete('/api/cadets/pending-updates/:id', resolvePendingUpdateHandler);
+
+// Direct Cloudinary Upload Endpoint (Server Proxy)
+app.post('/api/upload/cloudinary', async (req, res) => {
+  try {
+    const { image, file, folder, uploadPreset: customPreset } = req.body || {};
+    const targetFile = image || file;
+    if (!targetFile) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || cachedSettings['ngdc_cloudinary_cloud_name'] || 'hqmx8juj';
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || customPreset || cachedSettings['ngdc_cloudinary_upload_preset'] || 'ngdc_bncc';
+
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+
+    // Attempt 1: with folder
+    try {
+      const formData = new FormData();
+      formData.append('upload_preset', uploadPreset);
+      if (folder) formData.append('folder', folder);
+      formData.append('file', targetFile);
+
+      const cRes = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data: any = await cRes.json().catch(() => ({}));
+      if (cRes.ok && data?.secure_url) {
+        return res.json({ success: true, url: data.secure_url, public_id: data.public_id });
+      }
+
+      // Attempt 2: without folder if folder was provided and failed
+      if (folder) {
+        const retryForm = new FormData();
+        retryForm.append('upload_preset', uploadPreset);
+        retryForm.append('file', targetFile);
+
+        const retryRes = await fetch(uploadUrl, {
+          method: 'POST',
+          body: retryForm,
+        });
+
+        const retryData: any = await retryRes.json().catch(() => ({}));
+        if (retryRes.ok && retryData?.secure_url) {
+          return res.json({ success: true, url: retryData.secure_url, public_id: retryData.public_id });
+        }
+      }
+
+      return res.status(cRes.status || 400).json({
+        error: data?.error?.message || 'Cloudinary upload failed',
+        details: data,
+      });
+    } catch (uploadErr: any) {
+      return res.status(500).json({ error: uploadErr?.message || 'Cloudinary network request failed' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Server image upload error' });
   }
 });
 
@@ -1769,18 +1975,35 @@ async function saveCadetHandler(req: express.Request, res: express.Response) {
       return res.status(400).json({ error: 'Invalid cadet data' });
     }
 
-    const cadetId = String(cadet.id || `cadet_${cadet.cadetNo || Date.now()}`).trim();
-    const cleanCadet = { ...cadet, id: cadetId };
+    const rawNo = cadet.cadetNo ? String(cadet.cadetNo).trim().toUpperCase() : '';
+    const providedId = cadet.id ? String(cadet.id).trim() : '';
 
     const existingIndex = cachedCadets.findIndex(
-      (c) => String(c.id || '').trim() === cadetId || (cadet.cadetNo && c.cadetNo === cadet.cadetNo)
+      (c) =>
+        (providedId && String(c.id || '').trim() === providedId) ||
+        (rawNo && String(c.cadetNo || c.cadetNumber || '').trim().toUpperCase() === rawNo)
     );
 
+    let targetId = providedId;
+    if (existingIndex >= 0 && cachedCadets[existingIndex].id) {
+      targetId = cachedCadets[existingIndex].id;
+    }
+    if (!targetId) {
+      targetId = `usr-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+    }
+
+    const cleanCadet = {
+      ...(existingIndex >= 0 ? cachedCadets[existingIndex] : {}),
+      ...cadet,
+      id: targetId,
+    };
+
     if (existingIndex >= 0) {
-      cachedCadets[existingIndex] = { ...cachedCadets[existingIndex], ...cleanCadet };
+      cachedCadets[existingIndex] = cleanCadet;
     } else {
       cachedCadets.unshift(cleanCadet);
     }
+    cachedCadets = deduplicateCadetList(cachedCadets);
     cachedSettings['ngdc_cadet_users_v8'] = [...cachedCadets];
     syncVersion = Date.now();
 
@@ -1798,9 +2021,13 @@ async function saveCadetHandler(req: express.Request, res: express.Response) {
         const rawData = { ...cleanCadet };
         delete (rawData as any)._id;
 
+        const filter = rawNo
+          ? { $or: [{ id: targetId }, { cadetNo: rawNo }] }
+          : { id: targetId };
+
         await CadetModel.findOneAndUpdate(
-          { id: cadetId },
-          { ...cleanCadet, rawData, updatedAt: new Date() },
+          filter,
+          { ...cleanCadet, rawData, id: targetId, updatedAt: new Date() },
           { upsert: true, returnDocument: 'after' }
         );
 
@@ -1817,10 +2044,10 @@ async function saveCadetHandler(req: express.Request, res: express.Response) {
         );
       }
     } catch (dbErr) {
-      console.warn(`[MongoDB] Failed to persist cadet ${cadetId}:`, dbErr);
+      console.warn(`[MongoDB] Failed to persist cadet ${targetId}:`, dbErr);
     }
 
-    res.json({ success: true, id: cadetId, version: syncVersion });
+    res.json({ success: true, id: targetId, version: syncVersion });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to save cadet' });
   }

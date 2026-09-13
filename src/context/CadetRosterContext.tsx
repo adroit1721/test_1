@@ -16,6 +16,7 @@ import {
   deleteCadetFromApi,
   submitCadetProfileUpdateRequestToApi,
   fetchPendingProfileUpdatesFromApi,
+  resolvePendingProfileUpdateFromApi,
   fetchSiteSettingsFromApi,
   upsertSiteSettingToApi,
 } from '../utils/apiClient';
@@ -470,13 +471,21 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const status = user.status || existing?.status || 'Active';
       const isApproved = user.isApproved !== undefined ? user.isApproved : (existing?.isApproved !== undefined ? existing.isApproved : true);
 
+      // Prioritize preserving existing canonical ID so updates never fork or duplicate in MongoDB
+      const canonicalId =
+        (existing?.id && !/^\d{6,}$/.test(String(existing.id)))
+          ? existing.id
+          : (targetId && !/^\d{6,}$/.test(targetId))
+          ? targetId
+          : (existing?.id || targetId || `usr-${Date.now()}`);
+
       const updatedCadet: CadetUserAccount = {
         ...(existing || {}),
-        id: targetId || existing?.id || `usr-${Date.now()}`,
+        ...user,
+        id: canonicalId,
         cadetNo: targetCadetNo || origCadetNo || existing?.cadetNo || `NGDC-${Math.floor(1000 + Math.random() * 9000)}`,
         password: user.password || existing?.password || 'cadet123',
         name: user.name || existing?.name || 'Cadet',
-        ...user,
         category,
         platoon,
         rank,
@@ -493,7 +502,7 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const next = prev.map((u) => {
         if (!u) return u;
         const matches =
-          (targetId && String(u.id || '').trim() === targetId) ||
+          (canonicalId && String(u.id || '').trim() === canonicalId) ||
           (origCadetNo && String(u.cadetNo || '').trim().toUpperCase() === origCadetNo) ||
           (targetCadetNo && String(u.cadetNo || '').trim().toUpperCase() === targetCadetNo);
         if (!matches) return u;
@@ -752,35 +761,79 @@ export const CadetRosterProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [refreshPendingProfileUpdates]);
 
   const requestProfileUpdate = useCallback(async (cadetNo: string, changes: Partial<CadetUserAccount>) => {
+    const rawNo = String(cadetNo || '').trim().toUpperCase();
+    const existing = cadetUsers.find((c) => String(c.cadetNo || '').trim().toUpperCase() === rawNo);
+    const cadetName = changes.name || existing?.name || existing?.fullName || 'Cadet';
+
     const updateReq: CadetPendingUpdate = {
-      id: `upd-${Date.now()}`,
-      cadetNo,
-      cadetName: changes.name || 'Cadet',
-      requestedAt: new Date().toLocaleString(),
-      status: 'Pending Review',
+      id: `upd-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      cadetId: existing?.id,
+      cadetNo: rawNo,
+      cadetName,
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
       changes,
     };
 
-    setPendingProfileUpdates((prev) => [updateReq, ...prev]);
+    setPendingProfileUpdates((prev) => {
+      const next = [updateReq, ...prev.filter((p) => p.id !== updateReq.id)];
+      try {
+        localStorage.setItem('ngdc_cadet_pending_updates', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     try {
       await submitCadetProfileUpdateRequestToApi(updateReq);
     } catch (err) {
       console.warn('Failed to submit profile update to API:', err);
     }
     return { success: true, message: 'Profile update request submitted to Platoon Admin for review.' };
-  }, []);
+  }, [cadetUsers]);
 
-  const approveProfileUpdate = useCallback((requestId: string) => {
+  const approveProfileUpdate = useCallback(async (requestId: string) => {
     const req = pendingProfileUpdates.find((p) => p.id === requestId);
     if (!req) return;
 
-    updateCadetUser(req.cadetNo, req.changes, req.cadetNo);
-    setPendingProfileUpdates((prev) => prev.filter((p) => p.id !== requestId));
-  }, [pendingProfileUpdates, updateCadetUser]);
+    // Apply the exact changed fields to the existing cadet
+    const targetNo = req.cadetNo ? String(req.cadetNo).trim().toUpperCase() : '';
+    const existingCadet = cadetUsers.find((c) =>
+      (req.cadetId && c.id === req.cadetId) ||
+      (targetNo && String(c.cadetNo || '').trim().toUpperCase() === targetNo)
+    );
 
-  const rejectProfileUpdate = useCallback((requestId: string) => {
-    setPendingProfileUpdates((prev) => prev.filter((p) => p.id !== requestId));
-  }, []);
+    const targetId = existingCadet?.id || req.cadetId || req.cadetNo;
+    updateCadetUser(targetId, req.changes, targetNo);
+
+    // Update local state and persist remaining
+    const remaining = pendingProfileUpdates.filter((p) => p.id !== requestId);
+    setPendingProfileUpdates(remaining);
+    try {
+      localStorage.setItem('ngdc_cadet_pending_updates', JSON.stringify(remaining));
+    } catch {}
+
+    // Resolve in backend & MongoDB so it never reappears on tab change
+    try {
+      await resolvePendingProfileUpdateFromApi(requestId);
+    } catch (err) {
+      console.warn('Failed to resolve pending update on backend:', err);
+    }
+  }, [pendingProfileUpdates, cadetUsers, updateCadetUser]);
+
+  const rejectProfileUpdate = useCallback(async (requestId: string) => {
+    const remaining = pendingProfileUpdates.filter((p) => p.id !== requestId);
+    setPendingProfileUpdates(remaining);
+    try {
+      localStorage.setItem('ngdc_cadet_pending_updates', JSON.stringify(remaining));
+    } catch {}
+
+    // Resolve in backend & MongoDB so it never reappears on tab change
+    try {
+      await resolvePendingProfileUpdateFromApi(requestId);
+    } catch (err) {
+      console.warn('Failed to resolve rejected update on backend:', err);
+    }
+  }, [pendingProfileUpdates]);
 
   const [trainingManuals, setTrainingManuals] = useState<TrainingManual[]>(() => {
     if (typeof window !== 'undefined') {

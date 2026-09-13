@@ -531,6 +531,29 @@ export async function fetchPendingProfileUpdatesFromApi(): Promise<any[]> {
 }
 
 /**
+  * Resolve/dismiss a pending profile update request from server and MongoDB
+  */
+export async function resolvePendingProfileUpdateFromApi(
+  requestId: string
+): Promise<{ success: boolean; error?: string }> {
+  invalidateApiCache('site_settings');
+  try {
+    const res = await fetch(apiUrl(`/api/cadets/pending-updates/${encodeURIComponent(requestId)}/resolve`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+    invalidateApiCache('site_settings');
+    if (res.ok && data.success) {
+      return { success: true };
+    }
+    return { success: false, error: data.error || `Server returned ${res.status}` };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Network error' };
+  }
+}
+
+/**
  * Register a cadet applicant from public portal (does not require admin token)
  */
 export async function registerPublicCadetToApi(cadet: Partial<CadetUserAccount>): Promise<{ success: boolean; message?: string; cadet?: any }> {

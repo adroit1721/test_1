@@ -91,6 +91,27 @@ export async function uploadImageToCloudinary(
   file: File,
   folder: string = 'branding'
 ): Promise<string> {
+  // 1. Prioritize reliable server-side Cloudinary proxy
+  try {
+    const base64Data = await compressAndConvertToDataUrl(file, 800, 800, 0.9);
+    if (base64Data) {
+      const serverRes = await fetch('/api/upload/cloudinary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data, folder }),
+      });
+      if (serverRes.ok) {
+        const sData = await serverRes.json();
+        if (sData && sData.url) {
+          return sData.url;
+        }
+      }
+    }
+  } catch (serverErr) {
+    console.warn('[Cloudinary] Server proxy upload failed, falling back to direct:', serverErr);
+  }
+
+  // 2. Direct browser Cloudinary upload fallback
   const config = getCloudinaryConfig();
   if (config.cloudName && config.uploadPreset) {
     try {
@@ -159,7 +180,29 @@ export async function processPassportPhoto(
   file: File | string,
   _maxSizeKB: number = 300
 ): Promise<{ url: string; fileSizeKb: number; isCompliant: boolean }> {
+  // If base64 string provided, upload via server Cloudinary proxy first
   if (typeof file === 'string') {
+    if (file.startsWith('data:image')) {
+      try {
+        const serverRes = await fetch('/api/upload/cloudinary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: file, folder: 'cadet-passport-photos' }),
+        });
+        if (serverRes.ok) {
+          const sData = await serverRes.json();
+          if (sData && sData.url) {
+            return {
+              url: sData.url,
+              fileSizeKb: Math.round(file.length / 1024),
+              isCompliant: true,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Cloudinary proxy upload failed for base64 string in processPassportPhoto:', e);
+      }
+    }
     const compressed = await compressDataUrlIfNeeded(file, 300, 0.70);
     return {
       url: compressed,
@@ -168,20 +211,18 @@ export async function processPassportPhoto(
     };
   }
 
-  // If Cloudinary CDN is configured, upload to Cloudinary directly!
-  if (isCloudinaryConfigured()) {
-    try {
-      const cUrl = await uploadImageToCloudinary(file, 'cadet-passport-photos');
-      if (cUrl && (cUrl.startsWith('http://') || cUrl.startsWith('https://'))) {
-        return {
-          url: cUrl,
-          fileSizeKb: Math.round(file.size / 1024),
-          isCompliant: true,
-        };
-      }
-    } catch (e) {
-      console.warn('Cloudinary upload failed in processPassportPhoto:', e);
+  // If File, upload to Cloudinary via uploadImageToCloudinary
+  try {
+    const cUrl = await uploadImageToCloudinary(file, 'cadet-passport-photos');
+    if (cUrl && (cUrl.startsWith('http://') || cUrl.startsWith('https://'))) {
+      return {
+        url: cUrl,
+        fileSizeKb: Math.round(file.size / 1024),
+        isCompliant: true,
+      };
     }
+  } catch (e) {
+    console.warn('Cloudinary upload failed in processPassportPhoto:', e);
   }
 
   // Fallback: Generate 300x300 passport-spec compressed JPEG image (quality 0.70 for lightweight size ~15KB)

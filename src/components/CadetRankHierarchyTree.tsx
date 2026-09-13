@@ -296,8 +296,13 @@ export const CadetRankHierarchyTree: React.FC = () => {
 
   // Active serving approved cadets from Admin Context
   const servingCadets = useMemo(() => {
+    const seen = new Set<string>();
     return cadetUsers.filter((c) => {
       if (!c) return false;
+      const key = c.cadetNo ? `no_${String(c.cadetNo).trim().toUpperCase()}` : `id_${c.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+
       const type = (c.cadetType ? String(c.cadetType) : '').toLowerCase();
       const cat = (c.category ? String(c.category) : c.platoon ? String(c.platoon) : '').toLowerCase();
       const status = (c.status ? String(c.status) : '').toLowerCase();

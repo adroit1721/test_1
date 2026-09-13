@@ -123,6 +123,14 @@ export const CadetCornerTab: React.FC = () => {
   const approvedCadets = cadetUsers.filter((c) => c && !isPendingApplicant(c));
   const pendingApplicants = cadetUsers.filter(isPendingApplicant);
 
+  // Normalizer for pending profile updates (handles 'pending', 'Pending Review', etc.)
+  const isPendingUpdateReq = (r: any) => {
+    if (!r) return false;
+    const st = String(r.status || '').toLowerCase().trim();
+    return !st || st.includes('pending') || st === 'unapproved';
+  };
+  const activePendingUpdates = pendingProfileUpdates.filter(isPendingUpdateReq);
+
   const maleServingCount = approvedCadets.filter((c) => c.category === 'Male Platoon' && c.cadetType !== 'Ex-cadet').length;
   const femaleServingCount = approvedCadets.filter((c) => c.category === 'Female Platoon' && c.cadetType !== 'Ex-cadet').length;
   const bandServingCount = approvedCadets.filter((c) => c.category === 'Band Platoon' && c.cadetType !== 'Ex-cadet').length;
@@ -384,9 +392,9 @@ export const CadetCornerTab: React.FC = () => {
             >
               <UserCog className="w-3.5 h-3.5" />
               <span>Profile Updates</span>
-              {pendingProfileUpdates.filter(r => r.status === 'pending').length > 0 && (
+              {activePendingUpdates.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-600 text-white animate-pulse">
-                  {pendingProfileUpdates.filter(r => r.status === 'pending').length}
+                  {activePendingUpdates.length}
                 </span>
               )}
             </button>
@@ -988,14 +996,14 @@ export const CadetCornerTab: React.FC = () => {
             </div>
           </div>
 
-          {pendingProfileUpdates.filter(r => r.status === 'pending').length === 0 ? (
+          {activePendingUpdates.length === 0 ? (
             <div className="p-8 text-center bg-[#f6f3ed] dark:bg-[#141311] rounded-2xl border border-dashed border-[#cdc6b3] dark:border-[#423e35] text-xs text-[#695c4e] dark:text-[#aca596]">
               <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-600 mb-2" />
               <span>No pending profile update requests from cadets.</span>
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingProfileUpdates.filter(r => r.status === 'pending').map((req) => (
+              {activePendingUpdates.map((req) => (
                 <div key={req.id} className="p-5 bg-[#f6f3ed] dark:bg-[#151411] border border-[#cdc6b3]/60 dark:border-[#38352d] rounded-2xl space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#cdc6b3]/40 dark:border-[#38352d] pb-3">
                     <div>

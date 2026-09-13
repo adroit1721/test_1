@@ -44,8 +44,13 @@ export const CadetDirectoryView: React.FC<CadetDirectoryViewProps> = ({ isCadetL
 
   // Approved cadets are listed in the directory (or all cadets if admin is viewing)
   const approvedCadets = useMemo(() => {
+    const seen = new Set<string>();
     return cadetUsers.filter((c) => {
       if (!c) return false;
+      const key = c.cadetNo ? `no_${String(c.cadetNo).trim().toUpperCase()}` : `id_${c.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+
       if (isAdminLoggedIn) return true;
       if (c.isApproved === false || (c as any).isApproved === 'false') return false;
       const st = (c.status ? String(c.status) : '').toLowerCase();
