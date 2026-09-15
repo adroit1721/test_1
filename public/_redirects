@@ -1,3 +1,0 @@
-# Cloudflare Pages SPA Routing Rule
-# Ensures client-side React routes (e.g., /admin, /cadets, /recruitment, etc.) route to index.html without 404
-/*    /index.html   200
