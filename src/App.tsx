@@ -40,7 +40,6 @@ import { MaintenanceBanner } from './components/maintenance/MaintenanceBanner';
 import { MaintenanceLockdown } from './components/maintenance/MaintenanceLockdown';
 import { AdminMaintenanceBar } from './components/maintenance/AdminMaintenanceBar';
 import { InitialSiteLoader } from './components/InitialSiteLoader';
-import { BackendDiagnosticModal } from './components/BackendDiagnosticModal';
 
 export default function App() {
   // Connect to real-time Server-Sent Events (SSE) so all changes reflect instantly across all devices
@@ -55,8 +54,6 @@ export default function App() {
     } catch {}
     return true;
   });
-
-  const [isBackendDiagnosticOpen, setIsBackendDiagnosticOpen] = useState(false);
 
   const { activeTab, setActiveTab, selectedNotice, setSelectedNotice, selectedBlog, setSelectedBlog, selectedMemory, setSelectedMemory } = useAppStore(
     useShallow(state => ({
@@ -508,7 +505,6 @@ export default function App() {
         }}
         onOpenPrivacyModal={() => setShowLegalModal('Privacy Policy')}
         onOpenTermsModal={() => setShowLegalModal('Terms of Service')}
-        onOpenBackendDiagnostic={() => setIsBackendDiagnosticOpen(true)}
       />
 
       {/* Floating Shortcut to Return to Admin Panel if authenticated in session */}
@@ -529,11 +525,6 @@ export default function App() {
       )}
 
       {/* Interactive Modals */}
-      <BackendDiagnosticModal
-        isOpen={isBackendDiagnosticOpen}
-        onClose={() => setIsBackendDiagnosticOpen(false)}
-      />
-
       <NoticeDetailModal
         notice={selectedNotice}
         onClose={() => setSelectedNotice(null)}

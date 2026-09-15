@@ -2,14 +2,12 @@ import React from 'react';
 import { TabType, FooterSocialLink } from '../types';
 import { useAdminData } from '../context/AdminDataContext';
 import { MapPin, Phone, Mail, ExternalLink, ShieldCheck, Shield, Globe } from 'lucide-react';
-import { BackendStatusPill } from './BackendStatusPill';
 
 interface FooterProps {
   setActiveTab: (tab: TabType) => void;
   onOpenAdminLogin: () => void;
   onOpenPrivacyModal: () => void;
   onOpenTermsModal: () => void;
-  onOpenBackendDiagnostic?: () => void;
 }
 
 // Helper to render platform-specific brand SVG icons dynamically
@@ -86,7 +84,6 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenAdminLogin,
   onOpenPrivacyModal,
   onOpenTermsModal,
-  onOpenBackendDiagnostic,
 }) => {
   const { footerConfig, contactConfig } = useAdminData();
 
@@ -369,13 +366,8 @@ export const Footer: React.FC<FooterProps> = ({
         </div>
       </div>
 
-      {/* Bottom Bar with Centered Copyright, Backend Health Pill & STEALTH Admin Portal Login */}
+      {/* Bottom Bar with Centered Copyright & STEALTH Admin Portal Login */}
       <div className="mt-8 pt-5 border-t border-[#cdc6b3]/40 dark:border-[#423e35] flex flex-col items-center justify-center text-center relative space-y-2">
-        {/* Real-time Backend Diagnostic Connection Pill */}
-        <div className="pb-1">
-          <BackendStatusPill onClick={onOpenBackendDiagnostic || (() => {})} />
-        </div>
-
         {/* Centered Copyright Text */}
         <p className="text-xs sm:text-[13px] text-[#695c4e] dark:text-[#8f887a] font-medium leading-relaxed max-w-2xl px-2">
           {footerConfig.copyrightText || `© ${new Date().getFullYear()} NGDC-BNCC Platoon, New Govt. Degree College, Rajshahi. All rights reserved.`}
