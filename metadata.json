@@ -1,0 +1,6 @@
+{
+  "name": "BNCC | New Govt. Degree College, Rajshahi | NGDC BNCC Platoon Official",
+  "description": "Official Portal of BNCC (Bangladesh National Cadet Corps) at New Govt. Degree College, Rajshahi (NGDC). Access Cadet Recruitment, Notices, Events, Ranks & Gallery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
