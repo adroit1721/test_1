@@ -6,56 +6,70 @@
   <!-- Homepage / Main Portal -->
   <url>
     <loc>https://ngdcbncc.org/</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <!-- Notice Board -->
   <url>
     <loc>https://ngdcbncc.org/notices</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <!-- Cadet Recruitment -->
   <url>
     <loc>https://ngdcbncc.org/recruitment</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <!-- Cadet Directory / Ranks -->
   <url>
     <loc>https://ngdcbncc.org/cadets</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Honor Board -->
+  <url>
+    <loc>https://ngdcbncc.org/honor-board</loc>
+    <lastmod>2026-09-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Training & Events -->
+  <url>
+    <loc>https://ngdcbncc.org/training</loc>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- About NGDC BNCC Platoon -->
   <url>
     <loc>https://ngdcbncc.org/about</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- Photo & Event Gallery -->
   <url>
     <loc>https://ngdcbncc.org/gallery</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <!-- Blog & Memories -->
   <url>
     <loc>https://ngdcbncc.org/blog</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <!-- Contact NGDC BNCC Platoon -->
   <url>
     <loc>https://ngdcbncc.org/contact</loc>
-    <lastmod>2026-09-23</lastmod>
+    <lastmod>2026-09-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
