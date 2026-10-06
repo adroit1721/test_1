@@ -1,0 +1,9 @@
+# Googlebot, Bingbot, and general search crawlers
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/admin/
+
+# Sitemap location for search engines
+Sitemap: https://ngdcbncc.org/sitemap.xml
+Sitemap: https://www.ngdcbncc.org/sitemap.xml
