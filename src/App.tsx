@@ -199,7 +199,7 @@ export default function App() {
   // Dynamic SEO Page Title & Meta Tag Synchronization
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    let title = 'BNCC | New Govt. Degree College, Rajshahi | NGDC BNCC Platoon Official';
+    let title = 'NGDC BNCC Platoon | New Govt. Degree College, Rajshahi';
     let desc = 'Official Portal of BNCC (Bangladesh National Cadet Corps) at New Govt. Degree College, Rajshahi (NGDC). Access Cadet Recruitment, Notices, Events, Ranks & Gallery.';
     let canonical = 'https://ngdcbncc.org/';
 

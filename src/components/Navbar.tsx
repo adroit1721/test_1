@@ -44,7 +44,24 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'contact', label: 'Contact' },
   ];
 
-  const handleNavClick = (tabId: TabType) => {
+  const getTabHref = (tabId: TabType): string => {
+    switch (tabId) {
+      case 'about': return '/about';
+      case 'training': return '/training';
+      case 'notices': return '/notices';
+      case 'memories': return '/gallery';
+      case 'cadets': return '/cadets';
+      case 'honor': return '/honor';
+      case 'contact': return '/contact';
+      case 'recruitment': return '/recruitment';
+      default: return '/';
+    }
+  };
+
+  const handleNavClick = (tabId: TabType, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     setActiveTab(tabId);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -69,10 +86,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {navLinks.map((link) => {
               const isActive = activeTab === link.id;
               return (
-                <button
+                <a
                   key={link.id}
                   id={`nav-link-${link.id}`}
-                  onClick={() => handleNavClick(link.id)}
+                  href={getTabHref(link.id)}
+                  onClick={(e) => handleNavClick(link.id, e)}
                   className={`text-[13px] xl:text-sm font-semibold transition-all px-3.5 py-2.5 xl:px-4 rounded-full whitespace-nowrap cursor-pointer min-h-[42px] flex items-center justify-center ${
                     isActive
                       ? 'text-[#1c1c18] dark:text-[#faec9c] font-bold bg-[#eedc82]/85 dark:bg-[#eedc82]/20 backdrop-blur-md border border-[#6b5e10]/30 dark:border-[#eedc82]/40 shadow-xs scale-102'
@@ -80,16 +98,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   {link.label}
-                </button>
+                </a>
               );
             })}
           </div>
 
           {/* 9. Join Us Button */}
           <div className="shrink-0 pl-2">
-            <button
+            <a
               id="btn-join-us-nav"
-              onClick={onOpenJoinModal}
+              href="/recruitment"
+              onClick={(e) => {
+                e.preventDefault();
+                onOpenJoinModal();
+              }}
               className={`py-2.5 px-5 xl:px-6 rounded-full text-[13px] xl:text-sm font-bold cursor-pointer shadow-xs active:scale-95 transition-all flex items-center gap-1.5 min-h-[42px] backdrop-blur-md ${
                 activeTab === 'recruitment'
                   ? 'bg-[#eedc82] text-[#1c1c18] border-2 border-[#6b5e10] dark:border-[#eedc82] shadow-md ring-2 ring-[#eedc82]/50 scale-102 font-extrabold'
@@ -98,7 +120,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <span>Join Us</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
+            </a>
           </div>
         </div>
 
@@ -108,10 +130,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {navLinks.map((link) => {
               const isActive = activeTab === link.id;
               return (
-                <button
+                <a
                   key={link.id}
                   id={`nav-md-link-${link.id}`}
-                  onClick={() => handleNavClick(link.id)}
+                  href={getTabHref(link.id)}
+                  onClick={(e) => handleNavClick(link.id, e)}
                   className={`text-xs md:text-[13px] font-semibold transition-all px-3 py-2 rounded-full whitespace-nowrap cursor-pointer min-h-[38px] flex items-center justify-center ${
                     isActive
                       ? 'text-[#1c1c18] dark:text-[#faec9c] font-bold bg-[#eedc82]/85 dark:bg-[#eedc82]/20 backdrop-blur-md border border-[#6b5e10]/30 dark:border-[#eedc82]/40 shadow-xs'
@@ -119,20 +142,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   {link.label}
-                </button>
+                </a>
               );
             })}
           </div>
 
           {/* 9. Join Us Button */}
-          <button
+          <a
             id="btn-join-us-nav-md"
-            onClick={onOpenJoinModal}
+            href="/recruitment"
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenJoinModal();
+            }}
             className="bg-[#eedc82]/90 hover:bg-[#eedc82] dark:bg-[#eedc82]/85 dark:hover:bg-[#eedc82] text-[#1c1c18] dark:text-[#141310] border border-[#6b5e10]/30 dark:border-[#eedc82]/50 py-2 px-4 rounded-full text-xs md:text-[13px] font-bold shrink-0 ml-1 cursor-pointer whitespace-nowrap min-h-[38px] flex items-center gap-1 shadow-xs backdrop-blur-md"
           >
             <span>Join Us</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </a>
         </div>
 
         {/* Mobile Header Bar */}
@@ -146,14 +173,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <button
+          <a
             id="btn-mobile-join-pill"
-            onClick={onOpenJoinModal}
+            href="/recruitment"
+            onClick={(e) => {
+              e.preventDefault();
+              onOpenJoinModal();
+            }}
             className="bg-[#eedc82]/90 dark:bg-[#eedc82]/85 text-[#1c1c18] dark:text-[#141310] border border-[#6b5e10]/30 dark:border-[#eedc82]/50 py-1.5 px-4 rounded-full text-xs font-bold cursor-pointer shadow-xs min-h-[36px] flex items-center gap-1.5 backdrop-blur-md"
           >
             <span>Join Us</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          </a>
         </div>
 
         {/* Mobile Navigation Dropdown */}
@@ -167,10 +198,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {navLinks.map((link, index) => {
               const isActive = activeTab === link.id;
               return (
-                <button
+                <a
                   key={link.id}
                   id={`mobile-nav-link-${link.id}`}
-                  onClick={() => handleNavClick(link.id)}
+                  href={getTabHref(link.id)}
+                  onClick={(e) => handleNavClick(link.id, e)}
                   className={`text-left text-xs font-medium px-3.5 py-2 rounded-xl transition-colors flex items-center justify-between ${
                     isActive
                       ? 'bg-[#eedc82]/85 dark:bg-[#eedc82]/20 text-[#1c1c18] dark:text-[#faec9c] font-bold border border-transparent dark:border-[#eedc82]/30 shadow-xs'
@@ -179,7 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <span>{`${index + 1}. ${link.label}`}</span>
                   {isActive && <span className="text-[10px] uppercase font-bold tracking-wider">Active</span>}
-                </button>
+                </a>
               );
             })}
 

@@ -65,7 +65,8 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex-1 min-w-0 text-center cursor-pointer select-none px-1 sm:px-4"
           >
             <h1 className="text-base sm:text-2xl md:text-3xl font-extrabold text-[#1c1c18] dark:text-[#fcfbf7] tracking-tight uppercase leading-none font-sans drop-shadow-2xs">
-              {title}
+              <span>{title}</span>
+              <span className="sr-only"> - NGDC BNCC Platoon | New Govt. Degree College, Rajshahi</span>
             </h1>
 
             <p className="text-[7.5px] min-[360px]:text-[8.5px] min-[400px]:text-[9.5px] sm:text-xs md:text-sm font-medium text-[#695c4e] dark:text-[#aca596] tracking-normal mt-0.5 sm:mt-1 flex items-center justify-center gap-1 whitespace-nowrap overflow-hidden text-ellipsis">

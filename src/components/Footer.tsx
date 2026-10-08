@@ -208,40 +208,56 @@ export const Footer: React.FC<FooterProps> = ({
               </a>
             </li>
             <li>
-              <button
+              <a
                 id="footer-link-cadets"
-                onClick={() => handleNav('cadets')}
-                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                href="/cadets"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNav('cadets');
+                }}
+                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
               >
                 Cadets Corner & Directory
-              </button>
+              </a>
             </li>
             <li>
-              <button
+              <a
                 id="footer-link-recruitment"
-                onClick={() => handleNav('recruitment')}
-                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                href="/recruitment"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNav('recruitment');
+                }}
+                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
               >
                 Cadet Recruitment & Circular
-              </button>
+              </a>
             </li>
             <li>
-              <button
+              <a
                 id="footer-link-training"
-                onClick={() => handleNav('training')}
-                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                href="/training"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNav('training');
+                }}
+                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
               >
                 Training Routines & Camps
-              </button>
+              </a>
             </li>
             <li>
-              <button
+              <a
                 id="footer-link-notices"
-                onClick={() => handleNav('notices')}
-                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                href="/notices"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNav('notices');
+                }}
+                className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
               >
                 Notice Board & Circulars
-              </button>
+              </a>
             </li>
             {/* Render any additional custom admin links that are not duplicates */}
             {footerConfig.importantLinks && footerConfig.importantLinks.map((link) => {
@@ -271,12 +287,16 @@ export const Footer: React.FC<FooterProps> = ({
                       <ExternalLink className="w-3 h-3 text-[#8c8474] group-hover:text-[#6b5e10] dark:group-hover:text-[#eedc82] transition-colors" />
                     </a>
                   ) : (
-                    <button
-                      onClick={() => handleNav((link.tab as TabType) || 'about')}
-                      className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                    <a
+                      href={`/${link.tab || 'about'}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNav((link.tab as TabType) || 'about');
+                      }}
+                      className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
                     >
                       {link.label}
-                    </button>
+                    </a>
                   )}
                 </li>
               );
@@ -337,31 +357,43 @@ export const Footer: React.FC<FooterProps> = ({
                   </button>
                 </li>
                 <li>
-                  <button
+                  <a
                     id="footer-link-bncc-act"
-                    onClick={() => handleNav('about')}
-                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                    href="/about"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNav('about');
+                    }}
+                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
                   >
                     BNCC Act 2016 Guidelines
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button
+                  <a
                     id="footer-link-code"
-                    onClick={() => handleNav('about')}
-                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                    href="/about"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNav('about');
+                    }}
+                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
                   >
                     Cadet Code of Conduct
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button
+                  <a
                     id="footer-link-bylaws"
-                    onClick={() => handleNav('about')}
-                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer"
+                    href="/about"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNav('about');
+                    }}
+                    className="text-left text-[#555042] dark:text-[#9e9788] hover:text-[#6b5e10] dark:hover:text-[#eedc82] transition-colors cursor-pointer inline-block"
                   >
                     Platoon Standard By-laws
-                  </button>
+                  </a>
                 </li>
               </>
             )}

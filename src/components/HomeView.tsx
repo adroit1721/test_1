@@ -549,17 +549,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </p>
 
             <div className="pt-2 flex items-center gap-4">
-              <button
+              <a
                 id="btn-about-read-more"
-                onClick={() => {
+                href="/about"
+                onClick={(e) => {
+                  e.preventDefault();
                   setActiveTab('about');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="japandi-btn-secondary group cursor-pointer"
+                className="japandi-btn-secondary group cursor-pointer inline-flex items-center gap-1.5"
               >
                 <span>Read Full Platoon History</span>
                 <ArrowRight className="w-4 h-4 text-[#6b5e10] group-hover:translate-x-1 transition-transform" />
-              </button>
+              </a>
             </div>
           </motion.div>
 
@@ -687,16 +689,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
               )}
             </ul>
 
-            <button
+            <a
               id="btn-read-more-notices"
-              onClick={() => {
+              href="/notices"
+              onClick={(e) => {
+                e.preventDefault();
                 setActiveTab('notices');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="japandi-btn-secondary w-full"
+              className="japandi-btn-secondary w-full inline-block text-center"
             >
               Read More Notices
-            </button>
+            </a>
           </motion.div>
 
           {/* Recent Blogs */}
@@ -742,16 +746,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
               )}
             </ul>
 
-            <button
+            <a
               id="btn-read-more-blogs"
-              onClick={() => {
+              href="/notices"
+              onClick={(e) => {
+                e.preventDefault();
                 setActiveTab('notices');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="japandi-btn-secondary w-full"
+              className="japandi-btn-secondary w-full inline-block text-center"
             >
               Read More Blogs
-            </button>
+            </a>
           </motion.div>
         </div>
       </motion.section>
@@ -773,16 +779,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
               Glimpses of our journey, training discipline, and community achievements.
             </p>
           </div>
-          <button
+          <a
             id="btn-view-gallery-top"
-            onClick={() => {
+            href="/gallery"
+            onClick={(e) => {
+              e.preventDefault();
               setActiveTab('memories');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="japandi-btn-secondary hidden md:inline-flex"
+            className="japandi-btn-secondary hidden md:inline-flex items-center"
           >
             View Full Gallery
-          </button>
+          </a>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
@@ -816,16 +824,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
           ))}
         </div>
 
-        <button
+        <a
           id="btn-view-gallery-bottom"
-          onClick={() => {
+          href="/gallery"
+          onClick={(e) => {
+            e.preventDefault();
             setActiveTab('memories');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className="japandi-btn-secondary w-full md:hidden"
+          className="japandi-btn-secondary w-full md:hidden inline-block text-center"
         >
           View Full Gallery
-        </button>
+        </a>
       </motion.section>
 
       {/* 5. Cadets Corner CTA Section */}
